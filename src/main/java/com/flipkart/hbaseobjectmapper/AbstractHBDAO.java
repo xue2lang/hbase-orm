@@ -14,7 +14,7 @@ import java.util.*;
 /**
  * A <i>Data Access Object</i> class that enables simpler random access of HBase rows
  *
- * @param <T> Entity type that maps to an HBase row (must implement {@link HBRecord})
+ * @param <T> Entity type that maps to an HBase row (type must implement {@link HBRecord})
  */
 public abstract class AbstractHBDAO<T extends HBRecord> {
 
@@ -27,7 +27,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     protected final Map<String, Field> fields;
 
     /**
-     * Constructs a data access object. Classes extending this class should call this constructor using <code>super</code>
+     * Constructs a data access object. Classes extending this class <strong>must</strong> call this constructor using <code>super</code>
      *
      * @param conf Hadoop configuration
      */
@@ -57,11 +57,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
 
 
     /**
-     * Get multiple rows from HBase table in one shot using their row keys
-     *
-     * @param rowKeys Array of row keys
-     * @return Array of rows read as an array of your bean-like objects (of a class that implements {@link HBRecord})
-     * @throws IOException When HBase call fails
+     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
      */
     public T[] get(String[] rowKeys) throws IOException {
         List<Get> gets = new ArrayList<Get>(rowKeys.length);
@@ -76,6 +72,9 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return records;
     }
 
+    /**
+     * Get multiple rows from HBase table in one shot for a range of row keys (This API is a bulk variant of {@link #get(String)} method)
+     */
     public List<T> get(String startRowKey, String endRowKey) throws IOException {
         Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey));
         ResultScanner scanner = hTable.getScanner(scan);
@@ -100,11 +99,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Persist a list of your bean-like objects (of a class that implements {@link HBRecord}) to HBase table
-     *
-     * @param objs Objects that needs to be persisted
-     * @return Row keys of the objects persisted
-     * @throws IOException Thrown if there is an HBase error
+     * Persist a list of your bean-like objects (of a class that implements {@link HBRecord}) to HBase table (this is a bulk variant of {@link #persist(HBRecord)} method)
      */
     public List<String> persist(List<HBRecord> objs) throws IOException {
         List<Put> puts = new ArrayList<Put>(objs.size());
@@ -127,12 +122,15 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Delete HBase row that corresponds to a persisted object
+     * Delete HBase row by row key
      */
     public void delete(HBRecord obj) throws IOException {
         this.delete(obj.composeRowKey());
     }
 
+    /**
+     * Delete HBase rows for an array of row keys
+     */
     public void delete(String[] rowKeys) throws IOException {
         List<Delete> deletes = new ArrayList<Delete>(rowKeys.length);
         for (String rowKey : rowKeys) {
@@ -141,6 +139,9 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         this.hTable.delete(deletes);
     }
 
+    /**
+     * Delete HBase rows by referencing objects
+     */
     public void delete(HBRecord[] objs) throws IOException {
         String[] rowKeys = new String[objs.length];
         for (int i = 0; i < objs.length; i++) {
@@ -164,6 +165,9 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return hbObjectMapper.getColumnFamilies(hbRecordClass);
     }
 
+    /**
+     * Get list of fields (private variables of your bean-like class)
+     */
     public Set<String> getFields() {
         return fields.keySet();
     }
@@ -186,27 +190,27 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return field;
     }
 
+    private void addFieldValueToMap(Field field, HBColumn hbColumn, Map<String, Object> map, Result result) {
+        if (result.isEmpty())
+            return;
+        KeyValue kv = result.getColumnLatest(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
+        map.put(Bytes.toString(kv.getRow()), hbObjectMapper.toFieldValue(kv.getValue(), field));
+    }
+
     /**
      * Fetch value of column for a given row key and field
      *
      * @param rowKey    Row key to reference HBase row
      * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord})
-     * @return Value of the column (boxed)
+     * @return Value of the column (boxed), <code>null</code> if row with given rowKey doesn't exist or such field doesn't exist for the row
      * @throws IOException Thrown when there is an exception from HBase
      */
     public Object fetchFieldValue(String rowKey, String fieldName) throws IOException {
-        Field field = getField(fieldName);
-        HBColumn hbColumn = field.getAnnotation(HBColumn.class);
-        Get get = new Get(Bytes.toBytes(rowKey));
-        get.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-        Result result = this.hTable.get(get);
-        if (result.isEmpty()) return null;
-        KeyValue kv = result.getColumnLatest(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-        return hbObjectMapper.toFieldValue(kv.getValue(), field);
+        return fetchFieldValues(new String[]{rowKey}, fieldName).get(rowKey);
     }
 
     /**
-     * Bulk version of method {@link AbstractHBDAO#fetchFieldValue(String, String)} for a range of keys
+     * Fetch column values for a given range of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String startRowKey, String endRowKey, String fieldName) throws IOException {
         Field field = getField(fieldName);
@@ -216,15 +220,13 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         ResultScanner scanner = hTable.getScanner(scan);
         Map<String, Object> map = new HashMap<String, Object>();
         for (Result result : scanner) {
-            if (result.isEmpty()) continue;
-            KeyValue kv = result.getColumnLatest(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-            map.put(Bytes.toString(kv.getRow()), hbObjectMapper.toFieldValue(kv.getValue(), field));
+            addFieldValueToMap(field, hbColumn, map, result);
         }
         return map;
     }
 
     /**
-     * Bulk version of method {@link AbstractHBDAO#fetchFieldValue(String, String)} for an array of keys
+     * Fetch column values for a given array of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String[] rowKeys, String fieldName) throws IOException {
         Field field = getField(fieldName);
@@ -238,10 +240,9 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         Result[] results = this.hTable.get(gets);
         Map<String, Object> map = new HashMap<String, Object>(rowKeys.length);
         for (Result result : results) {
-            if (result.isEmpty()) continue;
-            KeyValue kv = result.getColumnLatest(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-            map.put(Bytes.toString(kv.getRow()), hbObjectMapper.toFieldValue(kv.getValue(), field));
+            addFieldValueToMap(field, hbColumn, map, result);
         }
         return map;
     }
+
 }
