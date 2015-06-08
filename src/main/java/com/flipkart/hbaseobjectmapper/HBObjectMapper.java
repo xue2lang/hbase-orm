@@ -218,6 +218,7 @@ public class HBObjectMapper {
     }
 
     private <T extends HBRecord> void validateHBColumnField(Field field) {
+        @SuppressWarnings("unchecked")
         Class<T> clazz = (Class<T>) field.getDeclaringClass();
         int modifiers = field.getModifiers();
         if (Modifier.isTransient(modifiers)) {
@@ -237,10 +238,10 @@ public class HBObjectMapper {
         }
     }
 
-    private NavigableMap<byte[], NavigableMap<byte[], byte[]>> objToMap(HBRecord obj) {
+    private NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> objToMap(HBRecord obj) {
         Class<? extends HBRecord> clazz = obj.getClass();
         validateHBClass(clazz);
-        NavigableMap<byte[], NavigableMap<byte[], byte[]>> map = new TreeMap<byte[], NavigableMap<byte[], byte[]>>(Bytes.BYTES_COMPARATOR);
+        NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>>(Bytes.BYTES_COMPARATOR);
         int numOfFieldsToWrite = 0;
         for (Field field : clazz.getDeclaredFields()) {
             HBColumn hbColumn = field.getAnnotation(HBColumn.class);
@@ -253,16 +254,21 @@ public class HBObjectMapper {
             if (hbColumn != null) {
                 byte[] family = Bytes.toBytes(hbColumn.family()), columnName = Bytes.toBytes(hbColumn.column());
                 if (!map.containsKey(family)) {
-                    map.put(family, new TreeMap<byte[], byte[]>(Bytes.BYTES_COMPARATOR));
+                    map.put(family, new TreeMap<byte[], NavigableMap<Long, byte[]>>(Bytes.BYTES_COMPARATOR));
                 }
-                Map<byte[], byte[]> columns = map.get(family);
-                byte[] fieldValue = getFieldValueAsByteArray(field, obj, hbColumn.serializeAsString());
+                Map<byte[], NavigableMap<Long, byte[]>> columns = map.get(family);
+                final byte[] fieldValue = getFieldValueAsByteArray(field, obj, hbColumn.serializeAsString());
                 boolean isFieldNull = (fieldValue == null || fieldValue.length == 0);
                 if (isFieldNull) {
                     continue;
                 }
+                final long timestamp = System.currentTimeMillis();
                 numOfFieldsToWrite++;
-                columns.put(columnName, fieldValue);
+                columns.put(columnName, new TreeMap<Long, byte[]>() {
+                    {
+                        put(timestamp, fieldValue);
+                    }
+                });
             }
         }
         if (numOfFieldsToWrite == 0) {
@@ -279,10 +285,14 @@ public class HBObjectMapper {
      */
     public Put writeValueAsPut(HBRecord obj) {
         Put put = new Put(composeRowKey(obj));
-        for (NavigableMap.Entry<byte[], NavigableMap<byte[], byte[]>> fe : objToMap(obj).entrySet()) {
+        for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : objToMap(obj).entrySet()) {
             byte[] family = fe.getKey();
-            for (Map.Entry<byte[], byte[]> e : fe.getValue().entrySet()) {
-                put.add(family, e.getKey(), e.getValue());
+            for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
+                byte[] columnName = e.getKey();
+                NavigableMap<Long, byte[]> column = e.getValue();
+                for (Map.Entry<Long, byte[]> columnVersion : column.entrySet()) {
+                    put.add(family, columnName, columnVersion.getKey(), columnVersion.getValue());
+                }
             }
         }
         return put;
@@ -312,10 +322,13 @@ public class HBObjectMapper {
     public Result writeValueAsResult(HBRecord obj) {
         byte[] row = composeRowKey(obj);
         List<KeyValue> keyValueList = new ArrayList<KeyValue>();
-        for (NavigableMap.Entry<byte[], NavigableMap<byte[], byte[]>> fe : objToMap(obj).entrySet()) {
+        for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : objToMap(obj).entrySet()) {
             byte[] family = fe.getKey();
-            for (Map.Entry<byte[], byte[]> e : fe.getValue().entrySet()) {
-                keyValueList.add(new KeyValue(row, family, e.getKey(), e.getValue()));
+            for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
+                byte[] columnName = e.getKey();
+                for (Map.Entry<Long, byte[]> columnVersion : e.getValue().entrySet()) {
+                    keyValueList.add(new KeyValue(row, family, columnName, columnVersion.getKey(), columnVersion.getValue()));
+                }
             }
         }
         return new Result(keyValueList);
