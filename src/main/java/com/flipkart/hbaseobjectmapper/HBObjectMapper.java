@@ -173,16 +173,25 @@ public class HBObjectMapper {
                     numOfHBRowKeys++;
                 }
                 HBColumn hbColumn = field.getAnnotation(HBColumn.class);
-                if (hbColumn == null)
-                    continue;
-                validateHBColumnField(clazz, field);
-                numOfHBColumns++;
-                if (!columns.add(new Pair<String, String>(hbColumn.family(), hbColumn.column()))) {
-                    throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumn.family(), hbColumn.column()));
+                HBColumnMultiVersion hbColumnMultiVersion = field.getAnnotation(HBColumnMultiVersion.class);
+                if (hbColumn != null && hbColumnMultiVersion != null) {
+                    throw new BothHBColumnAnnotationsPresentException(String.format("Class %s has a field %s that's annotated with both @%s and @%s (you can use only one of them on a field)", clazz, field.getName(), HBColumn.class.getName(), HBColumnMultiVersion.class.getName()));
+                } else if (hbColumn != null) {
+                    validateHBColumnField(field);
+                    numOfHBColumns++;
+                    if (!columns.add(new Pair<String, String>(hbColumn.family(), hbColumn.column()))) {
+                        throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumn.family(), hbColumn.column()));
+                    }
+                } else if (hbColumnMultiVersion != null) {
+                    validateHBColumnMultiVersionField(field);
+                    numOfHBColumns++;
+                    if (!columns.add(new Pair<String, String>(hbColumnMultiVersion.family(), hbColumnMultiVersion.column()))) {
+                        throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumnMultiVersion.family(), hbColumnMultiVersion.column()));
+                    }
                 }
             }
             if (numOfHBColumns == 0) {
-                throw new MissingHBColumnFieldsException(String.format("Class %s doesn't even have a single field annotated with %s", clazz.getName(), HBColumn.class.getName()));
+                throw new MissingHBColumnFieldsException(String.format("Class %s doesn't even have a single field annotated with %s or %s", clazz.getName(), HBColumn.class.getName(), HBColumnMultiVersion.class.getName()));
             }
             if (numOfHBRowKeys == 0) {
                 throw new MissingHBRowKeyFieldsException(String.format("Class %s doesn't even have a single field annotated with %s (how else would you construct the row key for HBase record?)", clazz.getName(), HBRowKey.class.getName()));
@@ -196,7 +205,20 @@ public class HBObjectMapper {
         }
     }
 
-    private <T extends HBRecord> void validateHBColumnField(Class<T> clazz, Field field) {
+    private <T extends HBRecord> void validateHBColumnMultiVersionField(Field field) {
+        validateHBColumnField(field);
+        if (!(field.getGenericType() instanceof ParameterizedType)) {
+            throw new HBColumnMultiVersionFieldInvalidDataTypeException();
+        }
+        ParameterizedType pType = (ParameterizedType) field.getGenericType();
+        Type[] typeArguments = pType.getActualTypeArguments();
+        if (typeArguments.length != 2 || !typeArguments[0].equals(Long.class)) {
+            throw new HBColumnMultiVersionFieldInvalidDataTypeException();
+        }
+    }
+
+    private <T extends HBRecord> void validateHBColumnField(Field field) {
+        Class<T> clazz = (Class<T>) field.getDeclaringClass();
         int modifiers = field.getModifiers();
         if (Modifier.isTransient(modifiers)) {
             throw new MappedColumnCantBeTransientException(String.format("In class \"%s\", the field \"%s\" is annotated with \"%s\", but is declared as transient (Transient fields cannot be persisted)", clazz.getName(), field.getName(), HBColumn.class.getName()));
@@ -407,7 +429,7 @@ public class HBObjectMapper {
                     else
                         return jsonObjMapper.readValue(value, fieldType);
                 } catch (IOException e) {
-                    throw new CouldNotDeserialize(e);
+                    throw new CouldNotDeserializeException(e);
                 }
             }
             return fieldValue;

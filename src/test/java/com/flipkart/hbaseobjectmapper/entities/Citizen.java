@@ -1,14 +1,12 @@
 package com.flipkart.hbaseobjectmapper.entities;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
-import com.flipkart.hbaseobjectmapper.HBTable;
+import com.flipkart.hbaseobjectmapper.*;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.NavigableMap;
 
 @ToString
 @EqualsAndHashCode
@@ -38,6 +36,8 @@ public class Citizen implements HBRecord {
     private BigDecimal f4;
     @HBColumn(family = "optional", column = "pincode", serializeAsString = true)
     private Integer pincode;
+    @HBColumnMultiVersion(family = "optional", column = "phone_number", serializeAsString = true)
+    private NavigableMap<Long, Integer> phoneNumberHistory;
     @HBColumn(family = "optional", column = "flags")
     private Map<String, Integer> extraFlags;
     @HBColumn(family = "optional", column = "dependents")
