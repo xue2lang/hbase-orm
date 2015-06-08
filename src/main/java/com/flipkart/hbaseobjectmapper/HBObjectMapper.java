@@ -74,7 +74,27 @@ public class HBObjectMapper {
         }
     }
 
-    private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], byte[]>> map, Class<T> clazz) {
+    private <T extends HBRecord> T noVersionMapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], byte[]>> noVersionMap, Class<T> clazz, final long timeStamp) {
+        NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> outputMap = new TreeMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>>(Bytes.BYTES_COMPARATOR);
+        for (NavigableMap.Entry<byte[], NavigableMap<byte[], byte[]>> familyMap : noVersionMap.entrySet()) {
+            byte[] family = familyMap.getKey();
+            outputMap.put(family, new TreeMap<byte[], NavigableMap<Long, byte[]>>(Bytes.BYTES_COMPARATOR));
+            NavigableMap<byte[], byte[]> columns = familyMap.getValue();
+            for (NavigableMap.Entry<byte[], byte[]> column : columns.entrySet()) {
+                final byte[] columnName = column.getKey();
+                final byte[] columnValue = column.getValue();
+                NavigableMap<byte[], NavigableMap<Long, byte[]>> outputFamilyMap = outputMap.get(family);
+                outputFamilyMap.put(columnName, new TreeMap<Long, byte[]>() {
+                    {
+                        put(timeStamp, columnValue);
+                    }
+                });
+            }
+        }
+        return mapToObj(rowKeyBytes, outputMap, clazz);
+    }
+
+    private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
         String rowKey = Bytes.toString(rowKeyBytes);
         T obj;
         validateHBClass(clazz);
@@ -92,11 +112,14 @@ public class HBObjectMapper {
             HBColumn hbColumn = field.getAnnotation(HBColumn.class);
             if (hbColumn == null)
                 continue;
-            NavigableMap<byte[], byte[]> familyMap = map.get(Bytes.toBytes(hbColumn.family()));
+            NavigableMap<byte[], NavigableMap<Long, byte[]>> familyMap = map.get(Bytes.toBytes(hbColumn.family()));
             if (familyMap == null || familyMap.isEmpty())
                 continue;
-            byte[] value = familyMap.get(Bytes.toBytes(hbColumn.column()));
-            objectSetFieldValue(obj, field, value);
+            NavigableMap<Long, byte[]> columnVersionsMap = familyMap.get(Bytes.toBytes(hbColumn.column()));
+            if (columnVersionsMap == null || columnVersionsMap.isEmpty())
+                continue;
+            Map.Entry<Long, byte[]> lastEntry = columnVersionsMap.lastEntry();
+            objectSetFieldValue(obj, field, lastEntry.getValue());
         }
         return obj;
     }
@@ -338,12 +361,12 @@ public class HBObjectMapper {
 
     private <T extends HBRecord> T readValueFromResult(Result result, Class<T> clazz) {
         if (isResultEmpty(result)) return null;
-        return mapToObj(result.getRow(), result.getNoVersionMap(), clazz);
+        return mapToObj(result.getRow(), result.getMap(), clazz);
     }
 
     private <T extends HBRecord> T readValueFromRowAndResult(byte[] rowKey, Result result, Class<T> clazz) {
         if (isResultEmpty(result)) return null;
-        return mapToObj(rowKey, result.getNoVersionMap(), clazz);
+        return mapToObj(rowKey, result.getMap(), clazz);
     }
 
     private void objectSetFieldValue(Object obj, Field field, byte[] value) {
@@ -438,7 +461,7 @@ public class HBObjectMapper {
                 columnValues.put(kv.getQualifier(), kv.getValue());
             }
         }
-        return mapToObj(rowKey, map, clazz);
+        return noVersionMapToObj(rowKey, map, clazz, put.getTimeStamp());
     }
 
     private <T extends HBRecord> T readValueFromPut(Put put, Class<T> clazz) {
