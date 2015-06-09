@@ -275,12 +275,14 @@ public class HBObjectMapper {
                     }
                 });
             } else if (hbColumnMultiVersion != null) {
+                NavigableMap<Long, byte[]> fieldValueVersions = getFieldValuesVersioned(field, obj, hbColumnMultiVersion.serializeAsString());
+                if (fieldValueVersions == null)
+                    continue;
                 byte[] family = Bytes.toBytes(hbColumnMultiVersion.family()), columnName = Bytes.toBytes(hbColumnMultiVersion.column());
                 if (!map.containsKey(family)) {
                     map.put(family, new TreeMap<byte[], NavigableMap<Long, byte[]>>(Bytes.BYTES_COMPARATOR));
                 }
                 Map<byte[], NavigableMap<Long, byte[]>> columns = map.get(family);
-                NavigableMap<Long, byte[]> fieldValueVersions = getFieldValuesVersioned(field, obj, hbColumnMultiVersion.serializeAsString());
                 numOfFieldsToWrite++;
                 columns.put(columnName, fieldValueVersions);
             }
@@ -303,17 +305,22 @@ public class HBObjectMapper {
     }
 
     private NavigableMap<Long, byte[]> getFieldValuesVersioned(Field field, HBRecord obj, boolean serializeAsString) {
-        field.setAccessible(true);
         ParameterizedType fieldNavigableMapType = ((ParameterizedType) field.getGenericType());
         Class<?> fieldType = jsonObjMapper.constructType(fieldNavigableMapType).getContentType().getRawClass();
         try {
+            field.setAccessible(true);
             NavigableMap<Long, Object> fieldValueVersions = (NavigableMap<Long, Object>) field.get(obj);
+            if (fieldValueVersions == null)
+                return null;
+            if (fieldValueVersions.size() == 0) {
+                throw new HBColumnMultiVersionFieldCantBeEmpty("Fields annotated with @" + HBColumnMultiVersion.class.getName() + " cannot be empty (null is ok, though)");
+            }
             NavigableMap<Long, byte[]> output = new TreeMap<Long, byte[]>();
             for (NavigableMap.Entry<Long, Object> e : fieldValueVersions.entrySet()) {
                 Long timestamp = e.getKey();
                 Object fieldValue = e.getValue();
                 if (fieldValue == null)
-                    return null;
+                    continue;
                 byte[] fieldValueBytes = valueToByteArray(fieldType, fieldValue, serializeAsString);
                 output.put(timestamp, fieldValueBytes);
             }
@@ -335,9 +342,11 @@ public class HBObjectMapper {
             byte[] family = fe.getKey();
             for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
                 byte[] columnName = e.getKey();
-                NavigableMap<Long, byte[]> column = e.getValue();
-                for (Map.Entry<Long, byte[]> columnVersion : column.entrySet()) {
-                    put.add(family, columnName, columnVersion.getKey(), columnVersion.getValue());
+                NavigableMap<Long, byte[]> columnValuesVersioned = e.getValue();
+                if (columnValuesVersioned == null)
+                    continue;
+                for (Map.Entry<Long, byte[]> versionAndValue : columnValuesVersioned.entrySet()) {
+                    put.add(family, columnName, versionAndValue.getKey(), versionAndValue.getValue());
                 }
             }
         }
@@ -372,7 +381,10 @@ public class HBObjectMapper {
             byte[] family = fe.getKey();
             for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
                 byte[] columnName = e.getKey();
-                for (Map.Entry<Long, byte[]> columnVersion : e.getValue().entrySet()) {
+                NavigableMap<Long, byte[]> valuesVersioned = e.getValue();
+                if (valuesVersioned == null)
+                    continue;
+                for (Map.Entry<Long, byte[]> columnVersion : valuesVersioned.entrySet()) {
                     keyValueList.add(new KeyValue(row, family, columnName, columnVersion.getKey(), columnVersion.getValue()));
                 }
             }
@@ -451,7 +463,7 @@ public class HBObjectMapper {
     }
 
     private void objectSetFieldValue(Object obj, Field field, NavigableMap<Long, byte[]> columnValuesVersioned, boolean serializeAsString) {
-        if (columnValuesVersioned == null || columnValuesVersioned.size() == 0)
+        if (columnValuesVersioned == null)
             return;
         try {
             field.setAccessible(true);
