@@ -3,7 +3,7 @@ package com.flipkart.hbaseobjectmapper;
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
 import com.flipkart.hbaseobjectmapper.entities.Dependents;
 import com.flipkart.hbaseobjectmapper.exceptions.AllHBColumnFieldsNullException;
-import com.flipkart.hbaseobjectmapper.exceptions.HBColumnMultiVersionFieldCantBeEmpty;
+import com.flipkart.hbaseobjectmapper.exceptions.FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty;
 import com.flipkart.hbaseobjectmapper.exceptions.HBRowKeyFieldCantBeNullException;
 import org.javatuples.Triplet;
 
@@ -45,6 +45,6 @@ public class TestObjects {
             triplet(new Citizen(null, -2, "row key field null 1", null, null, null, null, null, null, null, null, null, null, null), "one row key field null (variant 1)", HBRowKeyFieldCantBeNullException.class),
             triplet(new Citizen("IND", null, "row key field null 2", null, null, null, null, null, null, null, null, null, null, null), "one row key field null (variant 2)", HBRowKeyFieldCantBeNullException.class),
             triplet(new Citizen(null, null, "row key fields null", null, null, null, null, null, null, null, null, null, null, null), "all row key fields null", HBRowKeyFieldCantBeNullException.class),
-            triplet(new Citizen("IND", 1, "row key", null, null, null, null, null, null, null, null, new TreeMap<Long, Integer>(), null, null), "an empty field annotated with @" + HBColumnMultiVersion.class.getName(), HBColumnMultiVersionFieldCantBeEmpty.class)
+            triplet(new Citizen("IND", 1, "row key", null, null, null, null, null, null, null, null, new TreeMap<Long, Integer>(), null, null), "an empty field annotated with @" + HBColumnMultiVersion.class.getName(), FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty.class)
     );
 }
