@@ -194,7 +194,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         if (result.isEmpty())
             return;
         KeyValue kv = result.getColumnLatest(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-        map.put(Bytes.toString(kv.getRow()), hbObjectMapper.toFieldValue(kv.getValue(), field));
+        map.put(Bytes.toString(kv.getRow()), hbObjectMapper.byteArrayToValue(kv.getValue(), field.getType(), hbColumn.serializeAsString()));
     }
 
     /**

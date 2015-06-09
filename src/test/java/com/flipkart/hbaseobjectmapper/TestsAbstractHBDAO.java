@@ -45,7 +45,7 @@ public class TestsAbstractHBDAO {
         try {
             ExecutorService executorService = Executors.newSingleThreadExecutor();
             executorService.submit(new ClusterStarter(utility)).get(CLUSTER_START_TIMEOUT, TimeUnit.SECONDS);
-            utility.createTable("citizens".getBytes(), new byte[][]{"main".getBytes(), "optional".getBytes()});
+            utility.createTable("citizens".getBytes(), new byte[][]{"main".getBytes(), "optional".getBytes()}, 3);
             utility.createTable("citizen_summary".getBytes(), new byte[][]{"a".getBytes()});
             Configuration configuration = utility.getConfiguration();
             citizenDao = new CitizenDAO(configuration);

@@ -176,13 +176,13 @@ public class TestHBObjectMapper {
             String errorMessage = "An object with " + p.getValue1() + " should've thrown an " + IllegalArgumentException.class.getName();
             try {
                 hbMapper.writeValueAsResult(record);
-                fail(errorMessage + " while converting bean to Result");
+                fail(errorMessage + " while converting bean to Result\nFailing object = " + record);
             } catch (IllegalArgumentException ex) {
                 assertEquals("Mismatch in type of exception thrown", p.getValue2(), ex.getClass());
             }
             try {
                 hbMapper.writeValueAsPut(record);
-                fail(errorMessage + " while converting bean to Put");
+                fail(errorMessage + " while converting bean to Put\nFailing object = " + record);
             } catch (IllegalArgumentException ex) {
                 assertEquals("Mismatch in type of exception thrown", p.getValue2(), ex.getClass());
             }
