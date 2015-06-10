@@ -18,6 +18,7 @@ import java.util.*;
  */
 public abstract class AbstractHBDAO<T extends HBRecord> {
 
+    public static final int DEFAULT_NUM_VERSIONS = 1;
     protected final HBObjectMapper hbObjectMapper = new HBObjectMapper();
     protected final Class<T> hbRecordClass;
     protected final HTable hTable;
@@ -44,25 +45,37 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get one row from HBase table using row key
+     * Get one row from HBase table by it's row key
+     *
+     * @param rowKey   Row key
+     * @param versions Number of versions to be retrieved (default value: {@link #DEFAULT_NUM_VERSIONS})
+     * @return Contents of one row read as your bean-like object (of a class that implements {@link HBRecord})
+     * @throws IOException When HBase call fails
+     */
+    public T get(String rowKey, int versions) throws IOException {
+        Result result = this.hTable.get(new Get(Bytes.toBytes(rowKey)).setMaxVersions(versions));
+        return hbObjectMapper.readValue(rowKey, result, hbRecordClass);
+    }
+
+    /**
+     * Get one row from HBase table by it's row key
      *
      * @param rowKey Row key
      * @return Contents of one row read as your bean-like object (of a class that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T get(String rowKey) throws IOException {
-        Result result = this.hTable.get(new Get(Bytes.toBytes(rowKey)));
-        return hbObjectMapper.readValue(rowKey, result, hbRecordClass);
+        return get(rowKey, DEFAULT_NUM_VERSIONS);
     }
 
 
     /**
-     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     * Get multiple rows from HBase table for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
      */
-    public T[] get(String[] rowKeys) throws IOException {
+    public T[] get(String[] rowKeys, int versions) throws IOException {
         List<Get> gets = new ArrayList<Get>(rowKeys.length);
         for (String rowKey : rowKeys) {
-            gets.add(new Get(Bytes.toBytes(rowKey)));
+            gets.add(new Get(Bytes.toBytes(rowKey)).setMaxVersions(versions));
         }
         Result[] results = this.hTable.get(gets);
         @SuppressWarnings("unchecked") T[] records = (T[]) Array.newInstance(hbRecordClass, rowKeys.length);
@@ -73,16 +86,53 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
+     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     */
+    public T[] get(String[] rowKeys) throws IOException {
+        return get(rowKeys, DEFAULT_NUM_VERSIONS);
+    }
+
+    /**
+     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     */
+    public List<T> get(List<String> rowKeys, int versions) throws IOException {
+        List<Get> gets = new ArrayList<Get>(rowKeys.size());
+        for (String rowKey : rowKeys) {
+            gets.add(new Get(Bytes.toBytes(rowKey)).setMaxVersions(versions));
+        }
+        Result[] results = this.hTable.get(gets);
+        List<T> records = new ArrayList<T>(rowKeys.size());
+        for (Result result : results) {
+            records.add(hbObjectMapper.readValue(result, hbRecordClass));
+        }
+        return records;
+    }
+
+    /**
+     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     */
+    public List<T> get(List<String> rowKeys) throws IOException {
+        return get(rowKeys, DEFAULT_NUM_VERSIONS);
+    }
+
+    /**
      * Get multiple rows from HBase table in one shot for a range of row keys (This API is a bulk variant of {@link #get(String)} method)
      */
-    public List<T> get(String startRowKey, String endRowKey) throws IOException {
-        Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey));
+    public List<T> get(String startRowKey, String endRowKey, int versions) throws IOException {
+        Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey)).setMaxVersions(versions);
         ResultScanner scanner = hTable.getScanner(scan);
         List<T> records = new ArrayList<T>();
         for (Result result : scanner) {
             records.add(hbObjectMapper.readValue(result, hbRecordClass));
         }
         return records;
+    }
+
+    /**
+     * Get multiple rows from HBase table in one shot for a range of row keys (This API is a bulk variant of {@link #get(String)} method)
+     */
+    public List<T> get(String startRowKey, String endRowKey) throws IOException {
+        return get(startRowKey, endRowKey, DEFAULT_NUM_VERSIONS);
     }
 
     /**
@@ -101,7 +151,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     /**
      * Persist a list of your bean-like objects (of a class that implements {@link HBRecord}) to HBase table (this is a bulk variant of {@link #persist(HBRecord)} method)
      */
-    public List<String> persist(List<HBRecord> objs) throws IOException {
+    public List<String> persist(List<? extends HBRecord> objs) throws IOException {
         List<Put> puts = new ArrayList<Put>(objs.size());
         List<String> rowKeys = new ArrayList<String>(objs.size());
         for (HBRecord obj : objs) {

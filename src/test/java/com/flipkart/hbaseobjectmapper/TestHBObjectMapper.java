@@ -8,15 +8,25 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.javatuples.Triplet;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static com.flipkart.hbaseobjectmapper.TestUtil.triplet;
 import static org.junit.Assert.*;
 
 public class TestHBObjectMapper {
+    List<Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>> invalidRecordsAndErrorMessages = Arrays.asList(
+            triplet(Singleton.getInstance(), "A singleton class", EmptyConstructorInaccessibleException.class),
+            triplet(new ClassWithNoEmptyConstructor(1), "Class with no empty constructor", NoEmptyConstructorException.class),
+            triplet(new ClassWithPrimitives(1f), "A class with primitives", MappedColumnCantBePrimitiveException.class),
+            triplet(new ClassWithTwoFieldsMappedToSameColumn(), "Class with two fields mapped to same column", FieldsMappedToSameColumnException.class),
+            triplet(new ClassWithBadAnnotationStatic(), "Class with a static field mapped to HBase column", MappedColumnCantBeStaticException.class),
+            triplet(new ClassWithBadAnnotationTransient("James", "Gosling"), "Class with a transient field mapped to HBase column", MappedColumnCantBeTransientException.class),
+            triplet(new ClassWithNoHBColumns(), "Class with no fields mapped with HBColumn", MissingHBColumnFieldsException.class),
+            triplet(new ClassWithNoHBRowKeys(), "Class with no fields mapped with HBRowKey", MissingHBRowKeyFieldsException.class),
+            triplet(new ClassesWithFieldIncomptibleWithHBColumnMultiVersion.NotMap(), "Class with a incompatible field (not Map) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class),
+            triplet(new ClassesWithFieldIncomptibleWithHBColumnMultiVersion.NotNavigableMap(), "Class with a incompatible field (not NavigableMap) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class),
+            triplet(new ClassesWithFieldIncomptibleWithHBColumnMultiVersion.EntryKeyNotLong(), "Class with a incompatible field (NavigableMap's entry key not Long) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class)
+    );
 
     HBObjectMapper hbMapper = new HBObjectMapper();
     List<Citizen> validObjs = TestObjects.validObjs;
@@ -102,19 +112,6 @@ public class TestHBObjectMapper {
 
     @Test
     public void testInvalidClasses() {
-        List<Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>> invalidRecordsAndErrorMessages = Arrays.asList(
-                triplet(Singleton.getInstance(), "A singleton class", EmptyConstructorInaccessibleException.class),
-                triplet(new ClassWithNoEmptyConstructor(1), "Class with no empty constructor", NoEmptyConstructorException.class),
-                triplet(new ClassWithPrimitives(1f), "A class with primitives", MappedColumnCantBePrimitiveException.class),
-                triplet(new ClassWithTwoFieldsMappedToSameColumn(), "Class with two fields mapped to same column", FieldsMappedToSameColumnException.class),
-                triplet(new ClassWithBadAnnotationStatic(), "Class with a static field mapped to HBase column", MappedColumnCantBeStaticException.class),
-                triplet(new ClassWithBadAnnotationTransient("James", "Gosling"), "Class with a transient field mapped to HBase column", MappedColumnCantBeTransientException.class),
-                triplet(new ClassWithNoHBColumns(), "Class with no fields mapped with HBColumn", MissingHBColumnFieldsException.class),
-                triplet(new ClassWithNoHBRowKeys(), "Class with no fields mapped with HBRowKey", MissingHBRowKeyFieldsException.class),
-                triplet(new ClassesWithFieldIncomptibleWithHBColumnMultiVersion.NotMap(), "Class with a incompatible field (not Map) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class),
-                triplet(new ClassesWithFieldIncomptibleWithHBColumnMultiVersion.NotNavigableMap(), "Class with a incompatible field (not NavigableMap) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class),
-                triplet(new ClassesWithFieldIncomptibleWithHBColumnMultiVersion.EntryKeyNotLong(), "Class with a incompatible field (NavigableMap's entry key not Long) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class)
-        );
         Set<String> exceptionMessages = new HashSet<String>();
         for (Triplet<HBRecord, String, Class<? extends IllegalArgumentException>> p : invalidRecordsAndErrorMessages) {
             HBRecord record = p.getValue0();
@@ -273,6 +270,18 @@ public class TestHBObjectMapper {
             fail("If class can't be instantiated, a " + ObjectNotInstantiatableException.class.getName() + " was expected");
         } catch (ObjectNotInstantiatableException e) {
 
+        }
+    }
+
+    @Test
+    public void testHBColumnMultiVersion() {
+        Double[] testNumbers = new Double[]{3.14159, 2.71828, 0.0};
+        for (Double n : testNumbers) {
+            Result result = hbMapper.writeValueAsResult(new TestClassesHBColumnMultiVersion.Versionless(n));
+            TestClassesHBColumnMultiVersion.Versioned versioned = hbMapper.readValue(result, TestClassesHBColumnMultiVersion.Versioned.class);
+            NavigableMap<Long, Double> columnHistory = versioned.getC();
+            assertEquals("Column history size mismatch", 1, columnHistory.size());
+            assertEquals(String.format("Inconsistency between %s and %s", HBColumn.class.getSimpleName(), HBColumnMultiVersion.class.getSimpleName()), n, columnHistory.firstEntry().getValue());
         }
     }
 }

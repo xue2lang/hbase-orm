@@ -17,25 +17,23 @@ import static com.flipkart.hbaseobjectmapper.TestUtil.triplet;
 
 
 public class TestObjects {
-
-    public static final List<Citizen> validObjs = Arrays.asList(
-            new Citizen("IND", 101, "Manu", (short) 30, 30000, false, 2.3f, 4.33, 34L, new BigDecimal(100), 560034, new TreeMap<Long, Integer>() {
-                {
-                    put(System.currentTimeMillis() - 365L * 86400L * 1000L, 100); // last year
-                    put(System.currentTimeMillis() - 30L * 86400L * 1000L, 101); // last month
-                    put(System.currentTimeMillis(), 102);
+    /*
+     new TreeMap<Long, Integer>() {
+                    {
+                        put(System.currentTimeMillis() - 365L * 86400L * 1000L, 100); // last year
+                        put(System.currentTimeMillis() - 30L * 86400L * 1000L, 101); // last month
+                        put(System.currentTimeMillis(), 102);
+                    }
                 }
-            }, new HashMap<String, Integer>() {
+     */
+    public static final List<Citizen> validObjs = Arrays.asList(
+            new Citizen("IND", 101, "Manu", (short) 30, 30000, false, 2.3f, 4.33, 34L, new BigDecimal(100), 560034, null, new HashMap<String, Integer>() {
                 {
                     put("a", 1);
                     put("b", 1);
                 }
             }, new Dependents(121, Arrays.asList(122, 123))),
-            new Citizen("IND", 102, "Sathish", (short) 28, null, false, 2.3f, 4.33, -34L, new BigDecimal(100), 560034, new TreeMap<Long, Integer>() {
-                {
-                    put(System.currentTimeMillis(), 104);
-                }
-            }, new HashMap<String, Integer>(), new Dependents(131, null)),
+            new Citizen("IND", 102, "Sathish", (short) 28, null, false, 2.3f, 4.33, -34L, new BigDecimal(100), 560034, null, new HashMap<String, Integer>(), new Dependents(131, null)),
             new Citizen("IND", 103, "Akshay", (short) -1, 50000, false, null, 4.33e34, 34L, null, 560034, null, null, null),
             new Citizen("IND", 104, "Ananda", (short) 5, 30000, null, -2.3f, 4.33, 34L, new BigDecimal(1e50), 560034, null, null, new Dependents()),
             new Citizen("IND", 105, "Nilesh", null, null, null, null, null, null, null, null, null, null, new Dependents(null, Arrays.asList(141)))

@@ -297,9 +297,9 @@ public class HBObjectMapper {
     }
 
     private byte[] getFieldValueAsBytes(HBRecord obj, Field field, HBColumn hbColumn) {
-        field.setAccessible(true);
         Object fieldValue;
         try {
+            field.setAccessible(true);
             fieldValue = field.get(obj);
         } catch (IllegalAccessException e) {
             throw new BadHBaseLibStateException(e);
@@ -362,7 +362,7 @@ public class HBObjectMapper {
      * @param objs List of bean-like objects (of type that extends {@link HBRecord})
      * @return List of HBase's {@link Put} objects
      */
-    public List<Put> writeValueAsPut(List<HBRecord> objs) {
+    public List<Put> writeValueAsPut(List<? extends HBRecord> objs) {
         List<Put> puts = new ArrayList<Put>(objs.size());
         for (HBRecord obj : objs) {
             Put put = writeValueAsPut(obj);
@@ -401,7 +401,7 @@ public class HBObjectMapper {
      * @param objs List of bean-like objects (of type that extends {@link HBRecord})
      * @return List of HBase's {@link Result} objects
      */
-    public List<Result> writeValueAsResult(List<HBRecord> objs) {
+    public List<Result> writeValueAsResult(List<? extends HBRecord> objs) {
         List<Result> results = new ArrayList<Result>(objs.size());
         for (HBRecord obj : objs) {
             Result result = writeValueAsResult(obj);
