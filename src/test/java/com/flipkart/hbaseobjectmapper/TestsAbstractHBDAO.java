@@ -7,8 +7,8 @@ import com.flipkart.hbaseobjectmapper.entities.Citizen;
 import com.flipkart.hbaseobjectmapper.entities.TestClassesHBColumnMultiVersion.Versionless;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.MiniHBaseCluster;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -26,7 +26,7 @@ public class TestsAbstractHBDAO {
     CitizenDAO citizenDao;
     CitizenSummaryDAO citizenSummaryDAO;
     VersionlessDAO versionlessDAO;
-    List<Citizen> testObjs = TestObjects.validObjs;
+    List<Citizen> testObjs = TestObjects.validObjsNoVersion;
     final static long CLUSTER_START_TIMEOUT = 30;
 
     class ClusterStarter implements Callable<MiniHBaseCluster> {
@@ -43,29 +43,80 @@ public class TestsAbstractHBDAO {
         }
     }
 
+    private interface TablesCreator {
+        void createTable(String tableName, String... columnFamilies) throws IOException;
+    }
+
+    private static class ActualTablesCreator implements TablesCreator {
+        private HBaseAdmin hBaseAdmin;
+
+        private ActualTablesCreator(HBaseAdmin hBaseAdmin) {
+            this.hBaseAdmin = hBaseAdmin;
+        }
+
+        @Override
+        public void createTable(String tableName, String... columnFamilies) throws IOException {
+            hBaseAdmin.disableTable(tableName);
+            hBaseAdmin.deleteTable(tableName);
+            HTableDescriptor tableDescriptor = new HTableDescriptor(tableName);
+            for (String columnFamily : columnFamilies) {
+                tableDescriptor.addFamily(new HColumnDescriptor(columnFamily));
+            }
+            hBaseAdmin.createTable(tableDescriptor);
+        }
+    }
+
+    private static class InMemoryTablesCreator implements TablesCreator {
+
+        private HBaseTestingUtility utility;
+
+        private InMemoryTablesCreator(HBaseTestingUtility utility) {
+            this.utility = utility;
+        }
+
+        @Override
+        public void createTable(String tableName, String... columnFamilies) throws IOException {
+            byte[][] columnFamiliesBytes = new byte[columnFamilies.length][];
+            for (int i = 0; i < columnFamilies.length; i++) {
+                columnFamiliesBytes[i] = columnFamilies[i].getBytes();
+            }
+            utility.createTable(tableName.getBytes(), columnFamiliesBytes);
+        }
+    }
+
     @Before
     public void setup() throws Exception {
+        String useRegularHBaseClient = System.getenv("USE_REGULAR_HBASE_CLIENT");
         try {
-            ExecutorService executorService = Executors.newSingleThreadExecutor();
-            executorService.submit(new ClusterStarter(utility)).get(CLUSTER_START_TIMEOUT, TimeUnit.SECONDS);
-            configuration = utility.getConfiguration();
-            createTables();
-            createDAOs();
+            TablesCreator tablesCreator;
+            if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true"))) {
+                configuration = HBaseConfiguration.create();
+                System.out.println("Create HBase admin");
+                HBaseAdmin hBaseAdmin = new HBaseAdmin(configuration);
+                System.out.println("Recreating tables on HBase");
+                tablesCreator = new ActualTablesCreator(hBaseAdmin);
+            } else {
+                System.out.println("Starting test cluster");
+                ExecutorService executorService = Executors.newSingleThreadExecutor();
+                executorService.submit(new ClusterStarter(utility)).get(CLUSTER_START_TIMEOUT, TimeUnit.SECONDS);
+                configuration = utility.getConfiguration();
+                System.out.println("Creating tables on HBase test cluster");
+                tablesCreator = new InMemoryTablesCreator(utility);
+            }
+            createDAOs(tablesCreator);
+
         } catch (TimeoutException tox) {
             fail("In-memory HBase Test Cluster could not be started in " + CLUSTER_START_TIMEOUT + " seconds - aborted execution of DAO-related test cases");
         }
     }
 
-    private void createDAOs() throws IOException {
+    private void createDAOs(TablesCreator tablesCreator) throws IOException {
+        tablesCreator.createTable("citizens", "main", "optional");
+        tablesCreator.createTable("citizen_summary", "a");
+        tablesCreator.createTable("test_history", "f");
         citizenDao = new CitizenDAO(configuration);
         citizenSummaryDAO = new CitizenSummaryDAO(configuration);
         versionlessDAO = new VersionlessDAO(configuration);
-    }
-
-    private void createTables() throws IOException {
-        utility.createTable("citizens".getBytes(), new byte[][]{"main".getBytes(), "optional".getBytes()});
-        utility.createTable("citizen_summary".getBytes(), new byte[][]{"a".getBytes()});
-        utility.createTable("test_history".getBytes(), new byte[][]{"f".getBytes()}, 3);
     }
 
     public void testTableParticulars() {
