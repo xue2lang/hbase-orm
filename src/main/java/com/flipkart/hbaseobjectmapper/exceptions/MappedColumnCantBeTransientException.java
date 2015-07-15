@@ -4,8 +4,4 @@ public class MappedColumnCantBeTransientException extends IllegalArgumentExcepti
     public MappedColumnCantBeTransientException(String s) {
         super(s);
     }
-
-    public MappedColumnCantBeTransientException(String s, Throwable throwable) {
-        super(s, throwable);
-    }
 }

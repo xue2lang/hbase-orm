@@ -316,7 +316,7 @@ public class HBObjectMapper {
             if (fieldValueVersions == null)
                 return null;
             if (fieldValueVersions.size() == 0) {
-                throw new FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty("Fields annotated with @" + HBColumnMultiVersion.class.getName() + " cannot be empty (null is ok, though)");
+                throw new FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty();
             }
             NavigableMap<Long, byte[]> output = new TreeMap<Long, byte[]>();
             for (NavigableMap.Entry<Long, Object> e : fieldValueVersions.entrySet()) {
