@@ -32,14 +32,14 @@ public class TestObjects {
     );
 
     public static final List<Citizen> validObjsWithHBColumnMultiVersion = Arrays.asList(
-            new Citizen("IND", 105, "Ram", null, 30000, true, null, null, null, null, null, new TreeMap<Long, Integer>() {
+            new Citizen("IND", 106, "Ram", null, 30000, true, null, null, null, null, null, new TreeMap<Long, Integer>() {
                 {
                     put(System.currentTimeMillis() - 365L * 86400L * 1000L, 20000); // last year
                     put(System.currentTimeMillis() - 30L * 86400L * 1000L, 20001); // last month
                     put(System.currentTimeMillis(), 20002);
                 }
             }, null, null),
-            new Citizen("IND", 105, "Laxman", null, 35000, false, null, null, null, null, null, new TreeMap<Long, Integer>() {
+            new Citizen("IND", 107, "Laxman", null, 35000, false, null, null, null, null, null, new TreeMap<Long, Integer>() {
                 {
                     put(System.currentTimeMillis(), 20001);
                 }

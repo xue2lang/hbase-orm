@@ -2,9 +2,11 @@ package com.flipkart.hbaseobjectmapper;
 
 import com.flipkart.hbaseobjectmapper.daos.CitizenDAO;
 import com.flipkart.hbaseobjectmapper.daos.CitizenSummaryDAO;
-import com.flipkart.hbaseobjectmapper.daos.VersionlessDAO;
+import com.flipkart.hbaseobjectmapper.daos.CrawlDAO;
+import com.flipkart.hbaseobjectmapper.daos.CrawlNoVersionDAO;
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
-import com.flipkart.hbaseobjectmapper.entities.TestClassesHBColumnMultiVersion.Versionless;
+import com.flipkart.hbaseobjectmapper.entities.Crawl;
+import com.flipkart.hbaseobjectmapper.entities.CrawlNoVersion;
 import com.google.common.collect.Sets;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.*;
@@ -15,7 +17,10 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 import static org.junit.Assert.*;
@@ -25,7 +30,8 @@ public class TestsAbstractHBDAO {
     Configuration configuration;
     CitizenDAO citizenDao;
     CitizenSummaryDAO citizenSummaryDAO;
-    VersionlessDAO versionlessDAO;
+    CrawlDAO crawlDAO;
+    CrawlNoVersionDAO crawlNoVersionDAO;
     List<Citizen> testObjs = TestObjects.validObjsNoVersion;
     final static long CLUSTER_START_TIMEOUT = 30;
 
@@ -44,7 +50,7 @@ public class TestsAbstractHBDAO {
     }
 
     private interface TablesCreator {
-        void createTable(String tableName, String... columnFamilies) throws IOException;
+        void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException;
     }
 
     private static class ActualTablesCreator implements TablesCreator {
@@ -55,12 +61,12 @@ public class TestsAbstractHBDAO {
         }
 
         @Override
-        public void createTable(String tableName, String... columnFamilies) throws IOException {
+        public void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException {
             hBaseAdmin.disableTable(tableName);
             hBaseAdmin.deleteTable(tableName);
             HTableDescriptor tableDescriptor = new HTableDescriptor(tableName);
             for (String columnFamily : columnFamilies) {
-                tableDescriptor.addFamily(new HColumnDescriptor(columnFamily));
+                tableDescriptor.addFamily(new HColumnDescriptor(columnFamily).setMaxVersions(numVersions));
             }
             hBaseAdmin.createTable(tableDescriptor);
         }
@@ -75,12 +81,12 @@ public class TestsAbstractHBDAO {
         }
 
         @Override
-        public void createTable(String tableName, String... columnFamilies) throws IOException {
+        public void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException {
             byte[][] columnFamiliesBytes = new byte[columnFamilies.length][];
             for (int i = 0; i < columnFamilies.length; i++) {
                 columnFamiliesBytes[i] = columnFamilies[i].getBytes();
             }
-            utility.createTable(tableName.getBytes(), columnFamiliesBytes);
+            utility.createTable(tableName.getBytes(), columnFamiliesBytes, numVersions);
         }
     }
 
@@ -104,25 +110,25 @@ public class TestsAbstractHBDAO {
                 tablesCreator = new InMemoryTablesCreator(utility);
             }
             createDAOs(tablesCreator);
-
         } catch (TimeoutException tox) {
             fail("In-memory HBase Test Cluster could not be started in " + CLUSTER_START_TIMEOUT + " seconds - aborted execution of DAO-related test cases");
         }
     }
 
     private void createDAOs(TablesCreator tablesCreator) throws IOException {
-        tablesCreator.createTable("citizens", "main", "optional");
-        tablesCreator.createTable("citizen_summary", "a");
-        tablesCreator.createTable("test_history", "f");
+        tablesCreator.createTable("citizens", new String[]{"main", "optional"}, 1);
         citizenDao = new CitizenDAO(configuration);
+        tablesCreator.createTable("citizen_summary", new String[]{"a"}, 1);
         citizenSummaryDAO = new CitizenSummaryDAO(configuration);
-        versionlessDAO = new VersionlessDAO(configuration);
+        tablesCreator.createTable("crawl", new String[]{"a"}, 3);
+        crawlDAO = new CrawlDAO(configuration);
+        crawlNoVersionDAO = new CrawlNoVersionDAO(configuration);
     }
 
     public void testTableParticulars() {
         assertEquals(citizenDao.getTableName(), "citizens");
-        assertEquals(citizenSummaryDAO.getTableName(), "citizen_summary");
         assertTrue(TestUtil.setEquals(citizenDao.getColumnFamilies(), Sets.newHashSet("main", "optional")));
+        assertEquals(citizenSummaryDAO.getTableName(), "citizen_summary");
         assertTrue(TestUtil.setEquals(citizenSummaryDAO.getColumnFamilies(), Sets.newHashSet("a")));
     }
 
@@ -183,21 +189,42 @@ public class TestsAbstractHBDAO {
         assertNull("Record was not deleted: " + citizensToBeDeleted[1], citizenDao.get(citizensToBeDeleted[1].composeRowKey()));
     }
 
+    public void testHBaseMultiVersionDAO() throws Exception {
+        Double[] testNumbers = new Double[]{-1.0, Double.MAX_VALUE, Double.MIN_VALUE, 3.14159, 2.71828, 1.0};
+        Double[] testNumbersOfRange = Arrays.copyOfRange(testNumbers, testNumbers.length - 3, testNumbers.length);
+        // Written as unversioned, read as versioned
+        for (Double n : testNumbers) {
+            crawlNoVersionDAO.persist(new CrawlNoVersion("key").setF1(n));
+        }
+        Crawl crawl = crawlDAO.get("key", 3);
+        Double[] outputNumbers = crawl.getF1().values().toArray(new Double[3]);
+        assertArrayEquals("Issue with version history implementation when written as unversioned and read as versioned", testNumbersOfRange, outputNumbers);
+        crawlDAO.delete("key");
+        assertNull("Deleted row still exists when accessed as versioned DAO", crawlDAO.get("key"));
+        assertNull("Deleted row still exists when accessed as versionless DAO", crawlNoVersionDAO.get("key"));
+        // Written as versioned, read as unversioned+versioned
+        Crawl crawl2 = new Crawl("key2");
+        long timestamp = System.currentTimeMillis();
+        long i = 0;
+        for (Double n : testNumbers) {
+            crawl2.addF1(timestamp + i, n);
+            i++;
+        }
+        crawlDAO.persist(crawl2);
+        CrawlNoVersion crawlNoVersion = crawlNoVersionDAO.get("key2");
+        assertEquals("Entry with the highest version (i.e. timestamp) isn't the one that was returned by DAO get", crawlNoVersion.getF1(), testNumbers[testNumbers.length - 1]);
+        assertArrayEquals("Issue with version history implementation when written as versioned and read as unversioned", testNumbersOfRange, crawlDAO.get("key2", 3).getF1().values().toArray());
+        crawlDAO.delete("key2");
+        assertNull("Deleted row still exists when accessed as versioned DAO", crawlDAO.get("key2"));
+        assertNull("Deleted row still exists when accessed as versionless DAO", crawlNoVersionDAO.get("key2"));
+    }
+
+
     @Test
     public void test() throws Exception {
         testTableParticulars();
         testHBaseDAO();
-        testHBColumnMultiVersion();
-    }
-
-    public void testHBColumnMultiVersion() throws Exception {
-        Double[] testNumbers = new Double[]{3.14159, 2.71828, 0.0};
-        List<Versionless> list = new ArrayList<Versionless>();
-        for (Double n : testNumbers) {
-            list.add(new Versionless(n));
-        }
-        List<String> persistedKeys = versionlessDAO.persist(list);
-        versionlessDAO.get(persistedKeys);
+        testHBaseMultiVersionDAO();
     }
 
     @After
