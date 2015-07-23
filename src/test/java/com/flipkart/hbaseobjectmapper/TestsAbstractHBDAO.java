@@ -62,8 +62,10 @@ public class TestsAbstractHBDAO {
 
         @Override
         public void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException {
-            hBaseAdmin.disableTable(tableName);
-            hBaseAdmin.deleteTable(tableName);
+            if (hBaseAdmin.tableExists(tableName)) {
+                hBaseAdmin.disableTable(tableName);
+                hBaseAdmin.deleteTable(tableName);
+            }
             HTableDescriptor tableDescriptor = new HTableDescriptor(tableName);
             for (String columnFamily : columnFamilies) {
                 tableDescriptor.addFamily(new HColumnDescriptor(columnFamily).setMaxVersions(numVersions));
@@ -91,27 +93,32 @@ public class TestsAbstractHBDAO {
     }
 
     @Before
-    public void setup() throws Exception {
+    public void setup() {
         String useRegularHBaseClient = System.getenv("USE_REGULAR_HBASE_CLIENT");
         try {
-            TablesCreator tablesCreator;
+            TablesCreator tablesCreator = null;
             if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true"))) {
                 configuration = HBaseConfiguration.create();
-                System.out.println("Create HBase admin");
+                System.out.println("Creating HBase admin");
                 HBaseAdmin hBaseAdmin = new HBaseAdmin(configuration);
                 System.out.println("Recreating tables on HBase");
                 tablesCreator = new ActualTablesCreator(hBaseAdmin);
             } else {
-                System.out.println("Starting test cluster");
-                ExecutorService executorService = Executors.newSingleThreadExecutor();
-                executorService.submit(new ClusterStarter(utility)).get(CLUSTER_START_TIMEOUT, TimeUnit.SECONDS);
-                configuration = utility.getConfiguration();
-                System.out.println("Creating tables on HBase test cluster");
-                tablesCreator = new InMemoryTablesCreator(utility);
+                try {
+                    System.out.println("Starting test cluster");
+                    ExecutorService executorService = Executors.newSingleThreadExecutor();
+                    executorService.submit(new ClusterStarter(utility)).get(CLUSTER_START_TIMEOUT, TimeUnit.SECONDS);
+                    configuration = utility.getConfiguration();
+                    System.out.println("Creating tables on HBase test cluster");
+                    tablesCreator = new InMemoryTablesCreator(utility);
+                } catch (TimeoutException tox) {
+                    fail("In-memory HBase Test Cluster could not be started in " + CLUSTER_START_TIMEOUT + " seconds - aborted execution of DAO-related test cases");
+                }
             }
             createDAOs(tablesCreator);
-        } catch (TimeoutException tox) {
-            fail("In-memory HBase Test Cluster could not be started in " + CLUSTER_START_TIMEOUT + " seconds - aborted execution of DAO-related test cases");
+        } catch (Exception ioex) {
+            ioex.printStackTrace();
+            fail("Could not setup HBase for testing");
         }
     }
 
@@ -200,8 +207,10 @@ public class TestsAbstractHBDAO {
         Double[] outputNumbers = crawl.getF1().values().toArray(new Double[3]);
         assertArrayEquals("Issue with version history implementation when written as unversioned and read as versioned", testNumbersOfRange, outputNumbers);
         crawlDAO.delete("key");
-        assertNull("Deleted row still exists when accessed as versioned DAO", crawlDAO.get("key"));
-        assertNull("Deleted row still exists when accessed as versionless DAO", crawlNoVersionDAO.get("key"));
+        Crawl versioned = crawlDAO.get("key");
+        assertNull("Deleted row (with key " + versioned + ") still exists when accessed as versioned DAO", versioned);
+        CrawlNoVersion versionless = crawlNoVersionDAO.get("key");
+        assertNull("Deleted row (with key " + versionless + ") still exists when accessed as versionless DAO", versionless);
         // Written as versioned, read as unversioned+versioned
         Crawl crawl2 = new Crawl("key2");
         long timestamp = System.currentTimeMillis();

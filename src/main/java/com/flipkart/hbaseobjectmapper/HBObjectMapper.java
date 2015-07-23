@@ -75,26 +75,6 @@ public class HBObjectMapper {
         }
     }
 
-    private <T extends HBRecord> T noVersionMapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], byte[]>> noVersionMap, Class<T> clazz, final long timeStamp) {
-        NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> outputMap = new TreeMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>>(Bytes.BYTES_COMPARATOR);
-        for (NavigableMap.Entry<byte[], NavigableMap<byte[], byte[]>> familyMap : noVersionMap.entrySet()) {
-            byte[] family = familyMap.getKey();
-            outputMap.put(family, new TreeMap<byte[], NavigableMap<Long, byte[]>>(Bytes.BYTES_COMPARATOR));
-            NavigableMap<byte[], byte[]> columns = familyMap.getValue();
-            for (NavigableMap.Entry<byte[], byte[]> column : columns.entrySet()) {
-                final byte[] columnName = column.getKey();
-                final byte[] columnValue = column.getValue();
-                NavigableMap<byte[], NavigableMap<Long, byte[]>> outputFamilyMap = outputMap.get(family);
-                outputFamilyMap.put(columnName, new TreeMap<Long, byte[]>() {
-                    {
-                        put(timeStamp, columnValue);
-                    }
-                });
-            }
-        }
-        return mapToObj(rowKeyBytes, outputMap, clazz);
-    }
-
     private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
         String rowKey = Bytes.toString(rowKeyBytes);
         T obj;
@@ -211,7 +191,7 @@ public class HBObjectMapper {
         }
     }
 
-    private <T extends HBRecord> void validateHBColumnMultiVersionField(Field field) {
+    private void validateHBColumnMultiVersionField(Field field) {
         validateHBColumnField(field);
         if (!(field.getGenericType() instanceof ParameterizedType)) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " is not even a parameterized type");
@@ -492,6 +472,10 @@ public class HBObjectMapper {
         }
     }
 
+
+    /**
+     * Convert a byte array representing HBase column data to appropriate data type (boxed as object)
+     */
     public Object byteArrayToValue(byte[] value, Class<?> fieldClazz, boolean serializeAsString) {
         if (value == null || value.length == 0)
             return null;
@@ -640,8 +624,11 @@ public class HBObjectMapper {
         Set<String> columnFamilySet = new HashSet<String>();
         for (Field field : clazz.getDeclaredFields()) {
             HBColumn hbColumn = field.getAnnotation(HBColumn.class);
-            if (hbColumn == null) continue;
-            columnFamilySet.add(hbColumn.family());
+            if (hbColumn != null)
+                columnFamilySet.add(hbColumn.family());
+            HBColumnMultiVersion hbColumnMultiVersion = field.getAnnotation(HBColumnMultiVersion.class);
+            if (hbColumnMultiVersion != null)
+                columnFamilySet.add(hbColumnMultiVersion.family());
         }
         return columnFamilySet;
     }
@@ -691,10 +678,8 @@ public class HBObjectMapper {
         validateHBClass(clazz);
         Map<String, Field> mappings = new HashMap<String, Field>();
         for (Field field : clazz.getDeclaredFields()) {
-            HBColumn hbColumn = field.getAnnotation(HBColumn.class);
-            if (hbColumn == null)
-                continue;
-            mappings.put(field.getName(), field);
+            if (field.isAnnotationPresent(HBColumn.class) || field.isAnnotationPresent(HBColumnMultiVersion.class))
+                mappings.put(field.getName(), field);
         }
         return mappings;
     }
