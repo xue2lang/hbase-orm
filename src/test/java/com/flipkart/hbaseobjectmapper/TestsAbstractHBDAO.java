@@ -17,10 +17,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 
 import static org.junit.Assert.*;
@@ -98,7 +95,7 @@ public class TestsAbstractHBDAO {
         try {
             TablesCreator tablesCreator = null;
             if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true"))) {
-                configuration = HBaseConfiguration.create();
+                configuration = getRegularHBaseClient();
                 System.out.println("Creating HBase admin");
                 HBaseAdmin hBaseAdmin = new HBaseAdmin(configuration);
                 System.out.println("Recreating tables on HBase");
@@ -134,35 +131,58 @@ public class TestsAbstractHBDAO {
 
     public void testTableParticulars() {
         assertEquals(citizenDao.getTableName(), "citizens");
-        assertTrue(TestUtil.setEquals(citizenDao.getColumnFamilies(), Sets.newHashSet("main", "optional")));
+        assertTrue("Issue with column families of 'citizens' table\n" + citizenDao.getColumnFamilies(), TestUtil.setEquals(citizenDao.getColumnFamilies(), Sets.newHashSet("main", "optional")));
         assertEquals(citizenSummaryDAO.getTableName(), "citizen_summary");
-        assertTrue(TestUtil.setEquals(citizenSummaryDAO.getColumnFamilies(), Sets.newHashSet("a")));
+        assertTrue("Issue with column families of 'citizen_summary' table\n" + citizenSummaryDAO.getColumnFamilies(), TestUtil.setEquals(citizenSummaryDAO.getColumnFamilies(), Sets.newHashSet("a")));
     }
 
-    public void testHBaseDAO() throws Exception {
+    public void testHBaseDAO() throws IOException {
         String[] rowKeys = new String[testObjs.size()];
         Map<String, Map<String, Object>> expectedFieldValues = new HashMap<String, Map<String, Object>>();
         for (int i = 0; i < testObjs.size(); i++) {
             Citizen e = testObjs.get(i);
-            final String rowKey = citizenDao.persist(e);
-            rowKeys[i] = rowKey;
-            Citizen pe = citizenDao.get(rowKey);
-            assertEquals("Entry got corrupted upon persisting and fetching back", e, pe);
-            for (String f : citizenDao.getFields()) {
-                Field field = Citizen.class.getDeclaredField(f);
-                field.setAccessible(true);
-                final Object actual = citizenDao.fetchFieldValue(rowKey, f);
-                assertEquals("Field data corrupted upon persisting and fetching back", field.get(e), actual);
-                if (actual == null) continue;
-                if (!expectedFieldValues.containsKey(f)) {
-                    expectedFieldValues.put(f, new HashMap<String, Object>() {
-                        {
-                            put(rowKey, actual);
+            try {
+                final String rowKey = citizenDao.persist(e);
+                rowKeys[i] = rowKey;
+                Citizen pe = citizenDao.get(rowKey);
+                assertEquals("Entry got corrupted upon persisting and fetching back", e, pe);
+                for (String f : citizenDao.getFields()) {
+                    try {
+                        Field field = Citizen.class.getDeclaredField(f);
+                        WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+                        field.setAccessible(true);
+                        final Object actual = citizenDao.fetchFieldValue(rowKey, f);
+                        Object expected = field.get(e);
+                        if (hbColumn.isMultiVersioned()) {
+                            NavigableMap columnHistory = ((NavigableMap) field.get(e));
+                            if (columnHistory != null && columnHistory.size() > 0) {
+                                expected = columnHistory.lastEntry().getValue();
+                            }
                         }
-                    });
-                } else {
-                    expectedFieldValues.get(f).put(rowKey, actual);
+                        assertEquals("Field data corrupted upon persisting and fetching back", expected, actual);
+                        if (actual == null) continue;
+                        if (!expectedFieldValues.containsKey(f)) {
+                            expectedFieldValues.put(f, new HashMap<String, Object>() {
+                                {
+                                    put(rowKey, actual);
+                                }
+                            });
+                        } else {
+                            expectedFieldValues.get(f).put(rowKey, actual);
+                        }
+                    } catch (IllegalAccessException e1) {
+                        e1.printStackTrace();
+                        fail("Can't get field " + f + " from object " + e);
+                    } catch (NoSuchFieldException e1) {
+                        e1.printStackTrace();
+                        fail("Field missing: " + f);
+                    } catch (IOException ioex) {
+                        ioex.printStackTrace();
+                        fail("Could not fetch field '" + f + "' for row '" + rowKey + "'");
+                    }
                 }
+            } catch (IOException ioex) {
+                fail();
             }
         }
         List<Citizen> citizens = citizenDao.get(rowKeys[0], rowKeys[rowKeys.length - 1]);
@@ -239,5 +259,9 @@ public class TestsAbstractHBDAO {
     @After
     public void tearDown() throws Exception {
         utility.shutdownMiniCluster();
+    }
+
+    private Configuration getRegularHBaseClient() {
+        return HBaseConfiguration.create();
     }
 }

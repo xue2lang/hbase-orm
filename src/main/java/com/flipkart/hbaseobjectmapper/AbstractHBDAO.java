@@ -9,6 +9,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
 import java.util.*;
 
 /**
@@ -240,11 +241,13 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return field;
     }
 
-    private void addFieldValueToMap(Field field, HBColumn hbColumn, Map<String, Object> map, Result result) {
+    private void addFieldValueToMap(Field field, Map<String, Object> map, Result result) {
         if (result.isEmpty())
             return;
+        WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         KeyValue kv = result.getColumnLatest(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-        map.put(Bytes.toString(kv.getRow()), hbObjectMapper.byteArrayToValue(kv.getValue(), field.getType(), hbColumn.serializeAsString()));
+        Class<?> fieldType = hbColumn.isMultiVersioned() ? (Class) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1] : field.getType();
+        map.put(Bytes.toString(kv.getRow()), hbObjectMapper.byteArrayToValue(kv.getValue(), fieldType, hbColumn.serializeAsString()));
     }
 
     /**
@@ -264,13 +267,13 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      */
     public Map<String, Object> fetchFieldValues(String startRowKey, String endRowKey, String fieldName) throws IOException {
         Field field = getField(fieldName);
-        HBColumn hbColumn = field.getAnnotation(HBColumn.class);
+        WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey));
         scan.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         ResultScanner scanner = hTable.getScanner(scan);
         Map<String, Object> map = new HashMap<String, Object>();
         for (Result result : scanner) {
-            addFieldValueToMap(field, hbColumn, map, result);
+            addFieldValueToMap(field, map, result);
         }
         return map;
     }
@@ -280,7 +283,10 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      */
     public Map<String, Object> fetchFieldValues(String[] rowKeys, String fieldName) throws IOException {
         Field field = getField(fieldName);
-        HBColumn hbColumn = field.getAnnotation(HBColumn.class);
+        WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+        if (!hbColumn.isPresent()) {
+            throw new IOException();
+        }
         List<Get> gets = new ArrayList<Get>(rowKeys.length);
         for (String rowKey : rowKeys) {
             Get get = new Get(Bytes.toBytes(rowKey));
@@ -290,7 +296,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         Result[] results = this.hTable.get(gets);
         Map<String, Object> map = new HashMap<String, Object>(rowKeys.length);
         for (Result result : results) {
-            addFieldValueToMap(field, hbColumn, map, result);
+            addFieldValueToMap(field, map, result);
         }
         return map;
     }

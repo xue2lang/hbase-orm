@@ -282,7 +282,7 @@ public class TestHBObjectMapper {
             Crawl versioned = hbMapper.readValue(result, Crawl.class);
             NavigableMap<Long, Double> columnHistory = versioned.getF1();
             assertEquals("Column history size mismatch", 1, columnHistory.size());
-            assertEquals(String.format("Inconsistency between %s and %s", HBColumn.class.getSimpleName(), HBColumnMultiVersion.class.getSimpleName()), n, columnHistory.firstEntry().getValue());
+            assertEquals(String.format("Inconsistency between %s and %s", HBColumn.class.getSimpleName(), HBColumnMultiVersion.class.getSimpleName()), n, columnHistory.lastEntry().getValue());
             // Written as versioned, read as unversioned
             Result result1 = hbMapper.writeValueAsResult(new Crawl("key").addF1(Double.MAX_VALUE).addF1(Double.MAX_VALUE).addF1(Double.MAX_VALUE).addF1(n));
             CrawlNoVersion unversioned = hbMapper.readValue(result1, CrawlNoVersion.class);
