@@ -36,8 +36,8 @@
     </repositories>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <version.hadoop>2.0.0-cdh4.5.0</version.hadoop>
-        <version.hbase>0.94.6-cdh4.5.0</version.hbase>
+        <version.hadoop>2.0.0-cdh4.7.0</version.hadoop>
+        <version.hbase>0.94.15-cdh4.7.0</version.hbase>
     </properties>
     <distributionManagement>
         <repository>
