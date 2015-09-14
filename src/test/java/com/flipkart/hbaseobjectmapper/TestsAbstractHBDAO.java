@@ -60,14 +60,20 @@ public class TestsAbstractHBDAO {
         @Override
         public void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException {
             if (hBaseAdmin.tableExists(tableName)) {
+                System.out.format("Disabling table '%s': ", tableName);
                 hBaseAdmin.disableTable(tableName);
+                System.out.println("[DONE]");
+                System.out.format("Deleting table '%s': ", tableName);
                 hBaseAdmin.deleteTable(tableName);
+                System.out.println("[DONE]");
             }
             HTableDescriptor tableDescriptor = new HTableDescriptor(tableName);
             for (String columnFamily : columnFamilies) {
                 tableDescriptor.addFamily(new HColumnDescriptor(columnFamily).setMaxVersions(numVersions));
             }
+            System.out.format("Creating table '%s': ", tableName);
             hBaseAdmin.createTable(tableDescriptor);
+            System.out.println("[DONE]");
         }
     }
 
@@ -243,9 +249,31 @@ public class TestsAbstractHBDAO {
         CrawlNoVersion crawlNoVersion = crawlNoVersionDAO.get("key2");
         assertEquals("Entry with the highest version (i.e. timestamp) isn't the one that was returned by DAO get", crawlNoVersion.getF1(), testNumbers[testNumbers.length - 1]);
         assertArrayEquals("Issue with version history implementation when written as versioned and read as unversioned", testNumbersOfRange, crawlDAO.get("key2", 3).getF1().values().toArray());
-        crawlDAO.delete("key2");
-        assertNull("Deleted row still exists when accessed as versioned DAO", crawlDAO.get("key2"));
-        assertNull("Deleted row still exists when accessed as versionless DAO", crawlNoVersionDAO.get("key2"));
+        // Deletion tests:
+
+        // Written as unversioned, deleted as unversioned:
+        final String deleteKey1 = "write_unversioned__delete_unversioned";
+        crawlNoVersionDAO.persist(new Crawl(deleteKey1).addF1(10.01));
+        crawlNoVersionDAO.delete(deleteKey1);
+        assertNull("Row with key '" + deleteKey1 + "' exists, when written through unversioned DAO and deleted through unversioned DAO!", crawlNoVersionDAO.get(deleteKey1));
+
+        // Written as versioned, deleted as versioned:
+        final String deleteKey2 = "write_versioned__delete_versioned";
+        crawlDAO.persist(new Crawl(deleteKey2).addF1(10.02));
+        crawlDAO.delete(deleteKey2);
+        assertNull("Row with key '" + deleteKey2 + "' exists, when written through versioned DAO and deleted through versioned DAO!", crawlNoVersionDAO.get(deleteKey2));
+
+        // Written as unversioned, deleted as versioned:
+        final String deleteKey3 = "write_unversioned__delete_versioned";
+        crawlNoVersionDAO.persist(new Crawl(deleteKey3).addF1(10.03));
+        crawlDAO.delete(deleteKey3);
+        assertNull("Row with key '" + deleteKey3 + "' exists, when written through unversioned DAO and deleted through versioned DAO!", crawlNoVersionDAO.get(deleteKey3));
+
+        // Written as versioned, deleted as unversioned:
+        final String deleteKey4 = "write_versioned__delete_unversioned";
+        crawlDAO.persist(new Crawl(deleteKey4).addF1(10.04));
+        crawlNoVersionDAO.delete(deleteKey4);
+        assertNull("Row with key '" + deleteKey4 + "' exists, when written through versioned DAO and deleted through unversioned DAO!", crawlNoVersionDAO.get(deleteKey4));
     }
 
 
