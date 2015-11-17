@@ -1,5 +1,6 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.exceptions.FieldNotMappedToHBaseColumnException;
 import com.google.common.reflect.TypeToken;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.KeyValue;
@@ -20,12 +21,12 @@ import java.util.*;
 public abstract class AbstractHBDAO<T extends HBRecord> {
 
     public static final int DEFAULT_NUM_VERSIONS = 1;
-    protected final HBObjectMapper hbObjectMapper = new HBObjectMapper();
-    protected final Class<T> hbRecordClass;
+    protected static final HBObjectMapper hbObjectMapper = new HBObjectMapper();
     protected final HTable hTable;
     @SuppressWarnings("FieldCanBeLocal")
     private final TypeToken<T> typeToken = new TypeToken<T>(getClass()) {
     };
+    protected final Class<T> hbRecordClass;
     protected final Map<String, Field> fields;
 
     /**
@@ -241,13 +242,18 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return field;
     }
 
-    private void addFieldValueToMap(Field field, Map<String, Object> map, Result result) {
+    private static void populateFieldValuesToMap(Field field, Result result, Map<String, NavigableMap<Long, Object>> map) {
         if (result.isEmpty())
             return;
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-        KeyValue kv = result.getColumnLatest(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-        Class<?> fieldType = hbColumn.isMultiVersioned() ? (Class) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1] : field.getType();
-        map.put(Bytes.toString(kv.getRow()), hbObjectMapper.byteArrayToValue(kv.getValue(), fieldType, hbColumn.serializeAsString()));
+        List<KeyValue> kvs = result.getColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
+        for (KeyValue kv : kvs) {
+            Class<?> fieldType = hbColumn.isMultiVersioned() ? (Class) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1] : field.getType();
+            final String rowKey = Bytes.toString(kv.getRow());
+            if (!map.containsKey(rowKey))
+                map.put(rowKey, new TreeMap<Long, Object>());
+            map.get(rowKey).put(kv.getTimestamp(), hbObjectMapper.byteArrayToValue(kv.getValue(), fieldType, hbColumn.serializeAsString()));
+        }
     }
 
     /**
@@ -259,21 +265,42 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      * @throws IOException Thrown when there is an exception from HBase
      */
     public Object fetchFieldValue(String rowKey, String fieldName) throws IOException {
-        return fetchFieldValues(new String[]{rowKey}, fieldName).get(rowKey);
+        final NavigableMap<Long, Object> fieldValues = fetchFieldValues(rowKey, fieldName, 1);
+        if (fieldValues == null || fieldValues.isEmpty()) return null;
+        else return fieldValues.lastEntry().getValue();
+    }
+
+
+    public NavigableMap<Long, Object> fetchFieldValues(String rowKey, String fieldName, int versions) throws IOException {
+        return fetchFieldValues(new String[]{rowKey}, fieldName, versions).get(rowKey);
     }
 
     /**
      * Fetch column values for a given range of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String startRowKey, String endRowKey, String fieldName) throws IOException {
+        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, 1);
+        return toSingleVersioned(multiVersionedMap, 10);
+    }
+
+    private static Map<String, Object> toSingleVersioned(Map<String, NavigableMap<Long, Object>> multiVersionedMap, int mapInitialCapacity) {
+        Map<String, Object> map = new HashMap<String, Object>(mapInitialCapacity);
+        for (Map.Entry<String, NavigableMap<Long, Object>> e : multiVersionedMap.entrySet()) {
+            map.put(e.getKey(), e.getValue().lastEntry().getValue());
+        }
+        return map;
+    }
+
+    public NavigableMap<String, NavigableMap<Long, Object>> fetchFieldValues(String startRowKey, String endRowKey, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey));
         scan.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
+        scan.setMaxVersions(versions);
         ResultScanner scanner = hTable.getScanner(scan);
-        Map<String, Object> map = new HashMap<String, Object>();
+        NavigableMap<String, NavigableMap<Long, Object>> map = new TreeMap<String, NavigableMap<Long, Object>>();
         for (Result result : scanner) {
-            addFieldValueToMap(field, map, result);
+            populateFieldValuesToMap(field, result, map);
         }
         return map;
     }
@@ -282,21 +309,27 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      * Fetch column values for a given array of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String[] rowKeys, String fieldName) throws IOException {
+        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, 1);
+        return toSingleVersioned(multiVersionedMap, rowKeys.length);
+    }
+
+    public Map<String, NavigableMap<Long, Object>> fetchFieldValues(String[] rowKeys, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         if (!hbColumn.isPresent()) {
-            throw new IOException();
+            throw new FieldNotMappedToHBaseColumnException(hbRecordClass, fieldName);
         }
         List<Get> gets = new ArrayList<Get>(rowKeys.length);
         for (String rowKey : rowKeys) {
             Get get = new Get(Bytes.toBytes(rowKey));
+            get.setMaxVersions(versions);
             get.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
             gets.add(get);
         }
         Result[] results = this.hTable.get(gets);
-        Map<String, Object> map = new HashMap<String, Object>(rowKeys.length);
+        Map<String, NavigableMap<Long, Object>> map = new HashMap<String, NavigableMap<Long, Object>>(rowKeys.length);
         for (Result result : results) {
-            addFieldValueToMap(field, map, result);
+            populateFieldValuesToMap(field, result, map);
         }
         return map;
     }

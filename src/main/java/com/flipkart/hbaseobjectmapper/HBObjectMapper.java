@@ -473,7 +473,7 @@ public class HBObjectMapper {
     /**
      * Convert a byte array representing HBase column data to appropriate data type (boxed as object)
      */
-    public Object byteArrayToValue(byte[] value, Class<?> fieldClazz, boolean serializeAsString) {
+    Object byteArrayToValue(byte[] value, Class<?> fieldClazz, boolean serializeAsString) {
         if (value == null || value.length == 0)
             return null;
         Object fieldValue;
