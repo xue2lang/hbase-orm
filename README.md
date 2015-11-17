@@ -169,6 +169,13 @@ Add below entry within the `dependencies` section of your `pom.xml`:
 ```
 (See artifact details for [com.flipkart:hbase-object-mapper:1.1]((http://search.maven.org/#artifactdetails%7Ccom.flipkart%7Chbase-object-mapper%7C1.1%7Cjar)) on **Maven Central**)
 
+## Building the library
+To build this project, just do a `git clone` of this repository and execute `mvn clean install` from shell.
+
+Currently, this library depends on Hadoop and HBase from Cloudera version 4. If you're using a different version (or even different distribution like [HortonWorks](http://hortonworks.com/)), change the versions in [pom.xml](./pom.xml) to desired ones and do a `mvn clean install`.
+
+Test cases are very comprehensive - they even spin an [in-memory HBase test cluster](https://github.com/apache/hbase/blob/master/hbase-server/src/test/java/org/apache/hadoop/hbase/HBaseTestingUtility.java) to verify if test cases in near-realworld scenario.
+
 ## Releases
 
 The change log can be found in the [releases](../../releases) section.

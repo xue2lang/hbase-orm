@@ -23,8 +23,14 @@
     </licenses>
     <developers>
         <developer>
+            <id>m-manu</id>
             <name>Manu Manjunath</name>
-            <email>manu.m.karnataki@gmail.com</email>
+            <email>manu(dot)m(dot)karnataki(at)gmail(dot)com</email>
+            <roles>
+                <role>design</role>
+                <role>development</role>
+            </roles>
+            <organization>Flipkart</organization>
         </developer>
     </developers>
     <repositories>
