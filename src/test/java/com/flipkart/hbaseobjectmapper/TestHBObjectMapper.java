@@ -236,7 +236,7 @@ public class TestHBObjectMapper {
                 }
             });
             fail("null row key should've thrown a " + RowKeyCantBeEmptyException.class.getName());
-        } catch (RowKeyCantBeEmptyException npx) {
+        } catch (RowKeyCantBeEmptyException ignored) {
 
         }
         try {
@@ -252,13 +252,13 @@ public class TestHBObjectMapper {
                 }
             });
             fail("If row key can't be composed, an " + RowKeyCantBeComposedException.class.getName() + " was expected");
-        } catch (RowKeyCantBeComposedException e) {
+        } catch (RowKeyCantBeComposedException ignored) {
 
         }
         try {
             hbMapper.getRowKey(null);
             fail("If object is null, a " + NullPointerException.class.getName() + " was expected");
-        } catch (NullPointerException npx) {
+        } catch (NullPointerException ignored) {
 
         }
     }

@@ -265,21 +265,21 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      * @throws IOException Thrown when there is an exception from HBase
      */
     public Object fetchFieldValue(String rowKey, String fieldName) throws IOException {
-        final NavigableMap<Long, Object> fieldValues = fetchFieldValues(rowKey, fieldName, 1);
+        final NavigableMap<Long, Object> fieldValues = fetchFieldValueVersioned(rowKey, fieldName, 1);
         if (fieldValues == null || fieldValues.isEmpty()) return null;
         else return fieldValues.lastEntry().getValue();
     }
 
 
-    public NavigableMap<Long, Object> fetchFieldValues(String rowKey, String fieldName, int versions) throws IOException {
-        return fetchFieldValues(new String[]{rowKey}, fieldName, versions).get(rowKey);
+    public NavigableMap<Long, Object> fetchFieldValueVersioned(String rowKey, String fieldName, int versions) throws IOException {
+        return fetchFieldValuesVersioned(new String[]{rowKey}, fieldName, versions).get(rowKey);
     }
 
     /**
      * Fetch column values for a given range of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String startRowKey, String endRowKey, String fieldName) throws IOException {
-        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, 1);
+        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValuesVersioned(startRowKey, endRowKey, fieldName, 1);
         return toSingleVersioned(multiVersionedMap, 10);
     }
 
@@ -291,7 +291,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return map;
     }
 
-    public NavigableMap<String, NavigableMap<Long, Object>> fetchFieldValues(String startRowKey, String endRowKey, String fieldName, int versions) throws IOException {
+    public NavigableMap<String, NavigableMap<Long, Object>> fetchFieldValuesVersioned(String startRowKey, String endRowKey, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey));
@@ -309,11 +309,11 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      * Fetch column values for a given array of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String[] rowKeys, String fieldName) throws IOException {
-        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, 1);
+        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValuesVersioned(rowKeys, fieldName, 1);
         return toSingleVersioned(multiVersionedMap, rowKeys.length);
     }
 
-    public Map<String, NavigableMap<Long, Object>> fetchFieldValues(String[] rowKeys, String fieldName, int versions) throws IOException {
+    public Map<String, NavigableMap<Long, Object>> fetchFieldValuesVersioned(String[] rowKeys, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         if (!hbColumn.isPresent()) {

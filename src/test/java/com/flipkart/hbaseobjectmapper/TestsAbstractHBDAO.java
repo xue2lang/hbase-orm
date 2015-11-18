@@ -226,9 +226,11 @@ public class TestsAbstractHBDAO {
         Double[] testNumbers = new Double[]{-1.0, Double.MAX_VALUE, Double.MIN_VALUE, 3.14159, 2.71828, 1.0};
         Double[] testNumbersOfRange = Arrays.copyOfRange(testNumbers, testNumbers.length - 3, testNumbers.length);
         // Written as unversioned, read as versioned
+        List<HBRecord> objs = new ArrayList<HBRecord>();
         for (Double n : testNumbers) {
-            crawlNoVersionDAO.persist(new CrawlNoVersion("key").setF1(n));
+            objs.add(new CrawlNoVersion("key").setF1(n));
         }
+        crawlNoVersionDAO.persist(objs);
         Crawl crawl = crawlDAO.get("key", 3);
         Double[] outputNumbers = crawl.getF1().values().toArray(new Double[3]);
         assertArrayEquals("Issue with version history implementation when written as unversioned and read as versioned", testNumbersOfRange, outputNumbers);
@@ -279,13 +281,17 @@ public class TestsAbstractHBDAO {
 
     @Test
     public void test() throws Exception {
+        System.out.println("Testing table attributes");
         testTableParticulars();
+        System.out.println("Testing data access objects");
         testHBaseDAO();
+        System.out.println("Testing multi-versioned data access objects");
         testHBaseMultiVersionDAO();
     }
 
     @After
     public void tearDown() throws Exception {
+        System.out.println("Shutting down in-memory cluster");
         utility.shutdownMiniCluster();
     }
 

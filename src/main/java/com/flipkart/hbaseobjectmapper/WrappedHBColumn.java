@@ -8,7 +8,7 @@ import java.lang.reflect.Field;
 /**
  * A wrapper class for {@link HBColumn} and {@link HBColumnMultiVersion} annotations
  */
-public class WrappedHBColumn {
+class WrappedHBColumn {
     private String family, column;
     private boolean serializeAsString = false, multiVersioned = false, singleVersioned = false;
     private Class annotationClass;

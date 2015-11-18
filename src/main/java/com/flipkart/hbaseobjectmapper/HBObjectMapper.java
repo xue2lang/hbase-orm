@@ -147,7 +147,7 @@ public class HBObjectMapper {
         }
     }
 
-    private <T extends HBRecord> void validateHBClass(Class<T> clazz) {
+    private static <T extends HBRecord> void validateHBClass(Class<T> clazz) {
         Constructor constructor;
         try {
             Set<Pair<String, String>> columns = new HashSet<Pair<String, String>>();
@@ -187,31 +187,31 @@ public class HBObjectMapper {
         }
     }
 
-    private void validateHBColumnMultiVersionField(Field field) {
+    private static void validateHBColumnMultiVersionField(Field field) {
         validateHBColumnField(field);
         if (!(field.getGenericType() instanceof ParameterizedType)) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " is not even a parameterized type");
         }
-        if (!field.getType().equals(NavigableMap.class)) {
+        if (field.getType() != NavigableMap.class) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " is not a NavigableMap");
         }
         ParameterizedType pType = (ParameterizedType) field.getGenericType();
         Type[] typeArguments = pType.getActualTypeArguments();
-        if (typeArguments.length != 2 || !typeArguments[0].equals(Long.class)) {
+        if (typeArguments.length != 2 || typeArguments[0] != Long.class) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " has unexpected type params");
         }
     }
 
-    private <T extends HBRecord> void validateHBColumnField(Field field) {
+    private static <T extends HBRecord> void validateHBColumnField(Field field) {
         @SuppressWarnings("unchecked")
         Class<T> clazz = (Class<T>) field.getDeclaringClass();
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         int modifiers = field.getModifiers();
         if (Modifier.isTransient(modifiers)) {
-            throw new MappedColumnCantBeTransientException(field, hbColumn);
+            throw new MappedColumnCantBeTransientException(field, hbColumn.getName());
         }
         if (Modifier.isStatic(modifiers)) {
-            throw new MappedColumnCantBeStaticException(field, hbColumn);
+            throw new MappedColumnCantBeStaticException(field, hbColumn.getName());
         }
         Class<?> fieldClazz = field.getType();
         if (fieldClazz.isPrimitive()) {
@@ -267,7 +267,7 @@ public class HBObjectMapper {
             }
         }
         if (numOfFieldsToWrite == 0) {
-            throw new AllHBColumnFieldsNullException("Cannot accept input object with all it's column-mapped variables null");
+            throw new AllHBColumnFieldsNullException();
         }
         return map;
     }
@@ -550,7 +550,6 @@ public class HBObjectMapper {
             }
             List<KeyValue> kvList = familyNameAndColumnValues.getValue();
             for (KeyValue kv : kvList) {
-                Map<byte[], NavigableMap<Long, byte[]>> columnsValuesVersioned = map.get(family);
                 byte[] column = kv.getQualifier();
                 if (!map.get(family).containsKey(column)) {
                     map.get(family).put(column, new TreeMap<Long, byte[]>());
@@ -597,15 +596,15 @@ public class HBObjectMapper {
         return new ImmutableBytesWritable(composeRowKey(obj));
     }
 
-    private byte[] composeRowKey(HBRecord obj) {
+    private static byte[] composeRowKey(HBRecord obj) {
         String rowKey;
         try {
             rowKey = obj.composeRowKey();
         } catch (Exception ex) {
-            throw new RowKeyCantBeComposedException("Error while composing row key for object", ex);
+            throw new RowKeyCantBeComposedException(ex);
         }
         if (rowKey == null || rowKey.isEmpty()) {
-            throw new RowKeyCantBeEmptyException("Row key composed for object is null or empty");
+            throw new RowKeyCantBeEmptyException();
         }
         return Bytes.toBytes(rowKey);
     }
@@ -633,7 +632,7 @@ public class HBObjectMapper {
      * @param obj bean-like object (of type that extends {@link HBRecord})
      */
     public Pair<ImmutableBytesWritable, Result> writeValueAsRowKeyResultPair(HBRecord obj) {
-        return new Pair<ImmutableBytesWritable, Result>(this.getRowKey(obj), this.writeValueAsResult(obj));
+        return new Pair<ImmutableBytesWritable, Result>(getRowKey(obj), this.writeValueAsResult(obj));
     }
 
     /**
