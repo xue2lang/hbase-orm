@@ -1,5 +1,6 @@
 package com.flipkart.hbaseobjectmapper.mr.samples;
 
+import com.flipkart.hbaseobjectmapper.HBColumn;
 import com.flipkart.hbaseobjectmapper.HBObjectMapper;
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
 import org.apache.hadoop.hbase.client.Result;

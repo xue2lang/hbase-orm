@@ -24,8 +24,6 @@ import java.util.*;
  */
 public class HBObjectMapper {
 
-    private static final ObjectMapper jsonObjMapper = new ObjectMapper();
-
     private static final Map<Class, String> fromBytesMethodNames = new HashMap<Class, String>() {
         {
             put(Boolean.class, "toBoolean");
@@ -50,29 +48,39 @@ public class HBObjectMapper {
         }
     });
 
-    private final Map<String, Method> fromBytesMethods, toBytesMethods;
-    private final Map<String, Constructor> constructors;
+    private static final Map<String, Method> fromBytesMethods, toBytesMethods;
+    private static final Map<String, Constructor> constructors;
 
-    public HBObjectMapper() {
-        fromBytesMethods = new HashMap<String, Method>(fromBytesMethodNames.size());
-        toBytesMethods = new HashMap<String, Method>(fromBytesMethodNames.size());
-        constructors = new HashMap<String, Constructor>(fromBytesMethodNames.size());
-        for (Map.Entry<Class, String> e : fromBytesMethodNames.entrySet()) {
-            Class<?> clazz = e.getKey();
-            String toDataTypeMethodName = e.getValue();
-            Method fromBytesMethod, toBytesMethod;
-            Constructor<?> constructor;
-            try {
+    static {
+        try {
+            fromBytesMethods = new HashMap<String, Method>(fromBytesMethodNames.size());
+            toBytesMethods = new HashMap<String, Method>(fromBytesMethodNames.size());
+            constructors = new HashMap<String, Constructor>(fromBytesMethodNames.size());
+            for (Map.Entry<Class, String> e : fromBytesMethodNames.entrySet()) {
+                Class<?> clazz = e.getKey();
+                String toDataTypeMethodName = e.getValue();
+                Method fromBytesMethod, toBytesMethod;
+                Constructor<?> constructor;
                 fromBytesMethod = Bytes.class.getDeclaredMethod(toDataTypeMethodName, byte[].class);
                 toBytesMethod = Bytes.class.getDeclaredMethod("toBytes", nativeCounterParts.containsKey(clazz) ? nativeCounterParts.get(clazz) : clazz);
                 constructor = clazz.getConstructor(String.class);
-            } catch (Exception ex) {
-                throw new BadHBaseLibStateException(ex);
+                fromBytesMethods.put(clazz.getName(), fromBytesMethod);
+                toBytesMethods.put(clazz.getName(), toBytesMethod);
+                constructors.put(clazz.getName(), constructor);
             }
-            fromBytesMethods.put(clazz.getName(), fromBytesMethod);
-            toBytesMethods.put(clazz.getName(), toBytesMethod);
-            constructors.put(clazz.getName(), constructor);
+        } catch (Exception ex) {
+            throw new BadHBaseLibStateException(ex);
         }
+    }
+
+    private final ObjectMapper objectMapper;
+
+    public HBObjectMapper(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
+    public HBObjectMapper() {
+        this(new ObjectMapper());
     }
 
     private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
@@ -130,9 +138,9 @@ public class HBObjectMapper {
             } else {
                 try {
                     if (serializeAsString)
-                        return Bytes.toBytes(jsonObjMapper.writeValueAsString(value));
+                        return Bytes.toBytes(objectMapper.writeValueAsString(value));
                     else
-                        return jsonObjMapper.writeValueAsBytes(value);
+                        return objectMapper.writeValueAsBytes(value);
 
                 } catch (JsonProcessingException jpx) {
                     throw new ConversionFailedException(String.format("Don't know how to convert field of type %s to byte array", clazz.getName()));
@@ -147,7 +155,7 @@ public class HBObjectMapper {
         }
     }
 
-    private static <T extends HBRecord> void validateHBClass(Class<T> clazz) {
+    private <T extends HBRecord> void validateHBClass(Class<T> clazz) {
         Constructor constructor;
         try {
             Set<Pair<String, String>> columns = new HashSet<Pair<String, String>>();
@@ -187,7 +195,7 @@ public class HBObjectMapper {
         }
     }
 
-    private static void validateHBColumnMultiVersionField(Field field) {
+    private void validateHBColumnMultiVersionField(Field field) {
         validateHBColumnField(field);
         if (!(field.getGenericType() instanceof ParameterizedType)) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " is not even a parameterized type");
@@ -202,7 +210,7 @@ public class HBObjectMapper {
         }
     }
 
-    private static <T extends HBRecord> void validateHBColumnField(Field field) {
+    private <T extends HBRecord> void validateHBColumnField(Field field) {
         @SuppressWarnings("unchecked")
         Class<T> clazz = (Class<T>) field.getDeclaringClass();
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
@@ -218,8 +226,8 @@ public class HBObjectMapper {
             String suggestion = nativeCounterParts.containsValue(fieldClazz) ? String.format("- Use type %s instead", nativeCounterParts.inverse().get(fieldClazz).getName()) : "";
             throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable) %s", field.getName(), clazz.getName(), fieldClazz.getName(), suggestion));
         }
-        JavaType javaType = jsonObjMapper.constructType(field.getGenericType());
-        if (!jsonObjMapper.canDeserialize(javaType)) {
+        JavaType javaType = objectMapper.constructType(field.getGenericType());
+        if (!objectMapper.canDeserialize(javaType)) {
             throw new UnsupportedFieldTypeException(String.format("Field %s in class %s is of unsupported type (%s)", field.getName(), clazz.getName(), fieldClazz.getName()));
         }
     }
@@ -285,7 +293,7 @@ public class HBObjectMapper {
 
     private NavigableMap<Long, byte[]> getFieldValuesVersioned(Field field, HBRecord obj, boolean serializeAsString) {
         ParameterizedType fieldNavigableMapType = ((ParameterizedType) field.getGenericType());
-        Class<?> fieldType = jsonObjMapper.constructType(fieldNavigableMapType).getContentType().getRawClass();
+        Class<?> fieldType = objectMapper.constructType(fieldNavigableMapType).getContentType().getRawClass();
         try {
             field.setAccessible(true);
             @SuppressWarnings("unchecked")
@@ -448,7 +456,7 @@ public class HBObjectMapper {
         try {
             field.setAccessible(true);
             NavigableMap<Long, Object> columnValuesVersionedBoxed = new TreeMap<Long, Object>();
-            Class<?> fieldType = jsonObjMapper.constructType(field.getGenericType()).getContentType().getRawClass();
+            Class<?> fieldType = objectMapper.constructType(field.getGenericType()).getContentType().getRawClass();
             for (NavigableMap.Entry<Long, byte[]> versionAndValue : columnValuesVersioned.entrySet()) {
                 columnValuesVersionedBoxed.put(versionAndValue.getKey(), byteArrayToValue(versionAndValue.getValue(), fieldType, serializeAsString));
             }
@@ -492,11 +500,11 @@ public class HBObjectMapper {
                 }
             } else {
                 try {
-                    JavaType fieldType = jsonObjMapper.constructType(fieldClazz);
+                    JavaType fieldType = objectMapper.constructType(fieldClazz);
                     if (serializeAsString)
-                        return jsonObjMapper.readValue(Bytes.toString(value), fieldType);
+                        return objectMapper.readValue(Bytes.toString(value), fieldType);
                     else
-                        return jsonObjMapper.readValue(value, fieldType);
+                        return objectMapper.readValue(value, fieldType);
                 } catch (IOException e) {
                     throw new CouldNotDeserializeException(e);
                 }

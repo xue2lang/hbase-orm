@@ -189,6 +189,7 @@ public class TestHBObjectMapper {
         }
     }
 
+    /*
     @Test
     public void testEmptyResults() {
         Result nullResult = null, emptyResult = new Result(), resultWithBlankRowKey = new Result(new ImmutableBytesWritable(new byte[]{}));
@@ -208,6 +209,8 @@ public class TestHBObjectMapper {
         assertNull("Empty Put object should return null", emptyCitizen);
         assertNull(hbMapper.readValue(putWithBlankRowKey, Citizen.class));
     }
+
+    */
 
     @Test
     public void testGetRowKey() {

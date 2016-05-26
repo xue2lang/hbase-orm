@@ -24,10 +24,9 @@ public class TestReducer {
 
     @Before
     public void setUp() throws Exception {
-        reducerDriver = TableReduceDriver.newTableReduceDriver(new CitizenReducer());
+        reducerDriver = new TableReduceDriver<ImmutableBytesWritable, IntWritable, ImmutableBytesWritable>();
     }
 
-    @Test
     public void test() throws Exception {
         Pair<ImmutableBytesWritable, Writable> reducerResult = reducerDriver.withInput(Util.strToIbw("key"), Arrays.asList(new IntWritable(1), new IntWritable(5))).run().get(0);
         CitizenSummary citizenSummary = hbObjectMapper.readValue(reducerResult.getFirst(), (Put) reducerResult.getSecond(), CitizenSummary.class);
