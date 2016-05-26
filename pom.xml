@@ -43,6 +43,8 @@
     </repositories>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <version.hadoop>2.6.0.2.2.0.0-2041</version.hadoop>
+        <version.hbase>0.98.4.2.2.0.0-2041-hadoop2</version.hbase>
     </properties>
     <distributionManagement>
         <repository>
@@ -55,12 +57,12 @@
         <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-server</artifactId>
-            <version>0.98.4.2.2.0.0-2041-hadoop2</version>
+            <version>${version.hbase}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-client</artifactId>
-            <version>0.98.4.2.2.0.0-2041-hadoop2</version>
+            <version>${version.hbase}</version>
         </dependency>
         <dependency>
             <groupId>com.google.guava</groupId>
@@ -77,17 +79,17 @@
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-mapreduce-client-common</artifactId>
-            <version>2.6.0.2.2.0.0-2041</version>
+            <version>${version.hadoop}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-testing-util</artifactId>
-            <version>0.98.4.2.2.0.0-2041-hadoop2</version>
+            <version>${version.hbase}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.hadoop</groupId>
             <artifactId>hadoop-mapreduce-client-core</artifactId>
-            <version>2.6.0.2.2.0.0-2041</version>
+            <version>${version.hadoop}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.mrunit</groupId>

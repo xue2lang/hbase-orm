@@ -58,11 +58,11 @@ public class HBObjectMapper {
             fromBytesMethods = new HashMap<String, Method>(fromBytesMethodNames.size());
             toBytesMethods = new HashMap<String, Method>(fromBytesMethodNames.size());
             constructors = new HashMap<String, Constructor>(fromBytesMethodNames.size());
+            Method fromBytesMethod, toBytesMethod;
+            Constructor<?> constructor;
             for (Map.Entry<Class, String> e : fromBytesMethodNames.entrySet()) {
                 Class<?> clazz = e.getKey();
                 String toDataTypeMethodName = e.getValue();
-                Method fromBytesMethod, toBytesMethod;
-                Constructor<?> constructor;
                 fromBytesMethod = Bytes.class.getDeclaredMethod(toDataTypeMethodName, byte[].class);
                 toBytesMethod = Bytes.class.getDeclaredMethod("toBytes", nativeCounterParts.containsKey(clazz) ? nativeCounterParts.get(clazz) : clazz);
                 constructor = clazz.getConstructor(String.class);

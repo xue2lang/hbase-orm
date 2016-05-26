@@ -14,6 +14,7 @@ import org.apache.hadoop.mrunit.types.Pair;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -23,13 +24,13 @@ public class TestMapper extends AbstractMRTest {
     private TableMapDriver<ImmutableBytesWritable, IntWritable> mapDriver;
 
     @Before
-    public void setup() {
+    public void setUp() {
         mapDriver = TableMapDriver.newTableMapDriver(new CitizenMapper());
         super.setUp(mapDriver.getConfiguration());
     }
 
     @Test
-    public void testSingle() throws Exception {
+    public void testSingle() throws IOException {
         Citizen citizen = TestObjects.validObjs.get(0);
         mapDriver
                 .withInput(
@@ -42,7 +43,7 @@ public class TestMapper extends AbstractMRTest {
 
 
     @Test
-    public void testMultiple() throws Exception {
+    public void testMultiple() throws IOException {
         List<Pair<ImmutableBytesWritable, Result>> citizens = TestUtil.writeValueAsRowKeyResultPair(TestObjects.validObjs);
         List<Pair<ImmutableBytesWritable, IntWritable>> mapResults = mapDriver.withAll(citizens).run();
         for (Pair<ImmutableBytesWritable, IntWritable> mapResult : mapResults) {

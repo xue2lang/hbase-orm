@@ -189,28 +189,22 @@ public class TestHBObjectMapper {
         }
     }
 
-    /*
     @Test
     public void testEmptyResults() {
-        Result nullResult = null, emptyResult = new Result(), resultWithBlankRowKey = new Result(new ImmutableBytesWritable(new byte[]{}));
+        Result nullResult = null, blankResult = new Result(), emptyResult = Result.EMPTY_RESULT;
         Citizen nullCitizen = hbMapper.readValue(nullResult, Citizen.class);
         assertNull("Null Result object should return null", nullCitizen);
-        Citizen emptyCitizen = hbMapper.readValue(emptyResult, Citizen.class);
+        Citizen emptyCitizen = hbMapper.readValue(blankResult, Citizen.class);
         assertNull("Empty Result object should return null", emptyCitizen);
-        assertNull(hbMapper.readValue(resultWithBlankRowKey, Citizen.class));
+        assertNull(hbMapper.readValue(emptyResult, Citizen.class));
     }
 
     @Test
     public void testEmptyPuts() {
-        Put nullPut = null, emptyPut = new Put(), putWithBlankRowKey = new Put(new byte[]{});
+        Put nullPut = null;
         Citizen nullCitizen = hbMapper.readValue(nullPut, Citizen.class);
         assertNull("Null Put object should return null", nullCitizen);
-        Citizen emptyCitizen = hbMapper.readValue(emptyPut, Citizen.class);
-        assertNull("Empty Put object should return null", emptyCitizen);
-        assertNull(hbMapper.readValue(putWithBlankRowKey, Citizen.class));
     }
-
-    */
 
     @Test
     public void testGetRowKey() {
