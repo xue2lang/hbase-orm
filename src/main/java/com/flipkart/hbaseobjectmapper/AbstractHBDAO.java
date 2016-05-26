@@ -3,7 +3,8 @@ package com.flipkart.hbaseobjectmapper;
 import com.flipkart.hbaseobjectmapper.exceptions.FieldNotMappedToHBaseColumnException;
 import com.google.common.reflect.TypeToken;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -246,13 +247,13 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         if (result.isEmpty())
             return;
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-        List<KeyValue> kvs = result.getColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
-        for (KeyValue kv : kvs) {
+        List<Cell> cells = result.getColumnCells(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
+        for (Cell cell : cells) {
             Class<?> fieldType = hbColumn.isMultiVersioned() ? (Class) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1] : field.getType();
-            final String rowKey = Bytes.toString(kv.getRow());
+            final String rowKey = Bytes.toString(CellUtil.cloneRow(cell));
             if (!map.containsKey(rowKey))
                 map.put(rowKey, new TreeMap<Long, Object>());
-            map.get(rowKey).put(kv.getTimestamp(), hbObjectMapper.byteArrayToValue(kv.getValue(), fieldType, hbColumn.serializeAsString()));
+            map.get(rowKey).put(cell.getTimestamp(), hbObjectMapper.byteArrayToValue(CellUtil.cloneValue(cell), fieldType, hbColumn.serializeAsString()));
         }
     }
 

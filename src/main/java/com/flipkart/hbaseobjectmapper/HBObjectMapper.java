@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flipkart.hbaseobjectmapper.exceptions.*;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
+import org.apache.hadoop.hbase.Cell;
+import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Put;
@@ -364,7 +366,7 @@ public class HBObjectMapper {
      */
     public Result writeValueAsResult(HBRecord obj) {
         byte[] row = composeRowKey(obj);
-        List<KeyValue> keyValueList = new ArrayList<KeyValue>();
+        List<Cell> cellList = new ArrayList<Cell>();
         for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : objToMap(obj).entrySet()) {
             byte[] family = fe.getKey();
             for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
@@ -373,12 +375,11 @@ public class HBObjectMapper {
                 if (valuesVersioned == null)
                     continue;
                 for (Map.Entry<Long, byte[]> columnVersion : valuesVersioned.entrySet()) {
-                    keyValueList.add(new KeyValue(row, family, columnName, columnVersion.getKey(), columnVersion.getValue()));
+                    cellList.add(new KeyValue(row, family, columnName, columnVersion.getKey(), columnVersion.getValue()));
                 }
             }
         }
-        Result result = new Result(keyValueList);
-        return result;
+        return Result.create(cellList);
     }
 
     /**
@@ -550,20 +551,20 @@ public class HBObjectMapper {
     }
 
     private <T extends HBRecord> T readValueFromRowAndPut(byte[] rowKey, Put put, Class<T> clazz) {
-        Map<byte[], List<KeyValue>> rawMap = put.getFamilyMap();
+        Map<byte[], List<Cell>> rawMap = put.getFamilyCellMap();
         NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>>(Bytes.BYTES_COMPARATOR);
-        for (Map.Entry<byte[], List<KeyValue>> familyNameAndColumnValues : rawMap.entrySet()) {
+        for (Map.Entry<byte[], List<Cell>> familyNameAndColumnValues : rawMap.entrySet()) {
             byte[] family = familyNameAndColumnValues.getKey();
             if (!map.containsKey(family)) {
                 map.put(family, new TreeMap<byte[], NavigableMap<Long, byte[]>>(Bytes.BYTES_COMPARATOR));
             }
-            List<KeyValue> kvList = familyNameAndColumnValues.getValue();
-            for (KeyValue kv : kvList) {
-                byte[] column = kv.getQualifier();
+            List<Cell> cellList = familyNameAndColumnValues.getValue();
+            for (Cell cell : cellList) {
+                byte[] column = CellUtil.cloneQualifier(cell);
                 if (!map.get(family).containsKey(column)) {
                     map.get(family).put(column, new TreeMap<Long, byte[]>());
                 }
-                map.get(family).get(column).put(kv.getTimestamp(), kv.getValue());
+                map.get(family).get(column).put(cell.getTimestamp(), CellUtil.cloneValue(cell));
             }
         }
         return mapToObj(rowKey, map, clazz);
