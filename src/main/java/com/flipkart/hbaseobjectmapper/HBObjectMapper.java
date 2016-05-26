@@ -377,7 +377,8 @@ public class HBObjectMapper {
                 }
             }
         }
-        return new Result(keyValueList);
+        Result result = new Result(keyValueList);
+        return result;
     }
 
     /**

@@ -1,10 +1,10 @@
 package com.flipkart.hbaseobjectmapper.mr;
 
-import com.flipkart.hbaseobjectmapper.HBObjectMapper;
 import com.flipkart.hbaseobjectmapper.TestObjects;
 import com.flipkart.hbaseobjectmapper.TestUtil;
 import com.flipkart.hbaseobjectmapper.Util;
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
+import com.flipkart.hbaseobjectmapper.mr.lib.AbstractMRTest;
 import com.flipkart.hbaseobjectmapper.mr.lib.TableMapDriver;
 import com.flipkart.hbaseobjectmapper.mr.samples.CitizenMapper;
 import org.apache.hadoop.hbase.client.Result;
@@ -18,14 +18,14 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
-public class TestMapper {
+public class TestMapper extends AbstractMRTest {
 
-    HBObjectMapper hbObjectMapper = new HBObjectMapper();
-    TableMapDriver<ImmutableBytesWritable, IntWritable> mapDriver;
+    private TableMapDriver<ImmutableBytesWritable, IntWritable> mapDriver;
 
     @Before
-    public void setUp() throws Exception {
+    public void setup() {
         mapDriver = TableMapDriver.newTableMapDriver(new CitizenMapper());
+        super.setUp(mapDriver.getConfiguration());
     }
 
     @Test
