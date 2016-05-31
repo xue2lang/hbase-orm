@@ -22,7 +22,9 @@ import java.math.BigDecimal;
 import java.util.*;
 
 /**
- * An object mapper class that helps convert your bean-like objects to HBase's {@link Put} and {@link Result} objects (and vice-versa). For use in Map/Reduce jobs and their unit-tests
+ * <p>An object mapper class that helps convert your bean-like objects to HBase's {@link Put} and {@link Result} objects (and vice-versa).</p>
+ * <p>For use in MapReduce jobs involving HBase tables and their unit-tests</p>
+ * <p>This class is thread-safe</p>
  */
 public class HBObjectMapper {
 
@@ -77,10 +79,18 @@ public class HBObjectMapper {
 
     private final Codec codec;
 
+    /**
+     * Instantiate object of this class with a custom {@link Codec}
+     *
+     * @param codec Codec to be used for serialization and deserialization of columns
+     */
     public HBObjectMapper(Codec codec) {
         this.codec = codec;
     }
 
+    /**
+     * Instantiate an object of this class with default {@link Codec} of {@link JacksonJsonCodec}
+     */
     public HBObjectMapper() {
         this(new JacksonJsonCodec());
     }
@@ -325,7 +335,8 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts a bean-like object to HBase's {@link Put} object. For use in reducer jobs that extend HBase's <code>org.apache.hadoop.hbase.mapreduce.TableReducer</code> class
+     * <p>Converts a bean-like object to HBase's {@link Put} object</p>
+     * <p>For use in MapReduce jobs whose output is a HBase table (that is, jobs whose <code>Reducer</code> class extends HBase's <code>org.apache.hadoop.hbase.mapreduce.TableReducer</code> class)</p>
      *
      * @param obj bean-like object (of type that extends {@link HBRecord})
      * @return HBase's {@link Put} object
@@ -348,14 +359,15 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts a list of bean-like objects to a list of HBase's {@link Put} objects
+     * <p>Converts a list of bean-like objects to a list of HBase's {@link Put} objects.</p>
+     * <p>This method is a <i>bulk version</i> of {@link #writeValueAsPut(HBRecord)} method</p>
      *
-     * @param objs List of bean-like objects (of type that extends {@link HBRecord})
+     * @param objects List of bean-like objects (of type that extends {@link HBRecord})
      * @return List of HBase's {@link Put} objects
      */
-    public List<Put> writeValueAsPut(List<? extends HBRecord> objs) {
-        List<Put> puts = new ArrayList<Put>(objs.size());
-        for (HBRecord obj : objs) {
+    public List<Put> writeValueAsPut(List<? extends HBRecord> objects) {
+        List<Put> puts = new ArrayList<Put>(objects.size());
+        for (HBRecord obj : objects) {
             Put put = writeValueAsPut(obj);
             puts.add(put);
         }
@@ -363,7 +375,8 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts a bean-like object to HBase's {@link Result} object. For use in unit-tests of mapper jobs that extend <code>org.apache.hadoop.hbase.mapreduce.TableMapper</code> class
+     * <p>Converts a bean-like object to HBase's {@link Result} object.</p>
+     * <p>For use in unit-tests of MapReduce jobs whose input is an HBase table (that is, unit-testing jobs whose <code>Mapper</code> class extends <code>org.apache.hadoop.hbase.mapreduce.TableMapper</code> class)</p>
      *
      * @param obj bean-like object (of type that extends {@link HBRecord})
      * @return HBase's {@link Result} object
@@ -387,14 +400,15 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts a list of bean-like objects to a list of HBase's {@link Result} objects
+     * <p>Converts a list of bean-like objects to a list of HBase's {@link Result} objects</p>
+     * <p>This method is a <i>bulk version</i> of {@link #writeValueAsResult(HBRecord)} method</p>
      *
-     * @param objs List of bean-like objects (of type that extends {@link HBRecord})
+     * @param objects List of bean-like objects (of type that extends {@link HBRecord})
      * @return List of HBase's {@link Result} objects
      */
-    public List<Result> writeValueAsResult(List<? extends HBRecord> objs) {
-        List<Result> results = new ArrayList<Result>(objs.size());
-        for (HBRecord obj : objs) {
+    public List<Result> writeValueAsResult(List<? extends HBRecord> objects) {
+        List<Result> results = new ArrayList<Result>(objects.size());
+        for (HBRecord obj : objects) {
             Result result = writeValueAsResult(obj);
             results.add(result);
         }
@@ -402,7 +416,8 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts HBase's {@link Result} object to a bean-like object. For use in  mapper jobs that extend <code>org.apache.hadoop.hbase.mapreduce.TableMapper</code> class
+     * <p>Converts HBase's {@link Result} object to a bean-like object.</p>
+     * <p>For use in MapReduce jobs whose input is a HBase table (that is, jobs whose <code>Mapper</code> class extends <code>org.apache.hadoop.hbase.mapreduce.TableMapper</code> class)</p>
      *
      * @param rowKey Row key of the record that corresponds to {@link Result}. If this is <code>null</code>, an attempt will be made to resolve it from {@link Result}
      * @param result HBase's {@link Result} object
@@ -417,7 +432,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts HBase's {@link Result} object to a bean-like object
+     * Converts HBase's {@link Result} object to a bean-like object - a compact version of {@link #readValue(ImmutableBytesWritable, Result, Class)}
      *
      * @param result HBase's {@link Result} object
      * @param clazz  {@link Class} to which you want to convert to (must extend {@link HBRecord} class)
@@ -516,23 +531,24 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts HBase's {@link Put} object to a bean-like object. For unit-testing reducer jobs that extend <code>org.apache.hadoop.hbase.mapreduce.TableReducer</code> class
+     * <p>Converts HBase's {@link Put} object to a bean-like object</p>
+     * <p>For use in unit-tests of MapReduce jobs whose output is an HBase table (that is, unit-testing jobs whose <code>Reducer</code> class extends <code>org.apache.hadoop.hbase.mapreduce.TableReducer</code> class)</p>
      *
-     * @param rowKeyBytes Row key of the record that corresponds to {@link Put}. If this is <code>null</code>, an attempt will be made to resolve it from {@link Put} object
-     * @param put         HBase's {@link Put} object
-     * @param clazz       {@link Class} to which you want to convert to (must extend {@link HBRecord} class)
+     * @param rowKey Row key of the record that corresponds to {@link Put}. If this is <code>null</code>, an attempt will be made to resolve it from {@link Put} object
+     * @param put    HBase's {@link Put} object
+     * @param clazz  {@link Class} to which you want to convert to (must extend {@link HBRecord} class)
      * @return Bean-like object
      */
-    public <T extends HBRecord> T readValue(ImmutableBytesWritable rowKeyBytes, Put put, Class<T> clazz) {
-        if (rowKeyBytes == null)
+    public <T extends HBRecord> T readValue(ImmutableBytesWritable rowKey, Put put, Class<T> clazz) {
+        if (rowKey == null)
             return readValueFromPut(put, clazz);
         else
-            return readValueFromRowAndPut(rowKeyBytes.get(), put, clazz);
+            return readValueFromRowAndPut(rowKey.get(), put, clazz);
     }
 
 
     /**
-     * Converts HBase's {@link Put} object to a bean-like object
+     * Converts HBase's {@link Put} object to a bean-like object. This method is a variant of {@link #readValue(ImmutableBytesWritable, Put, Class)}.
      *
      * @param rowKey Row key of the record that corresponds to {@link Put}. If this is <code>null</code>, an attempt will be made to resolve it from {@link Put} object
      * @param put    HBase's {@link Put} object
@@ -574,7 +590,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts HBase's {@link Put} object to a bean-like object
+     * Converts HBase's {@link Put} object to a bean-like object - a compact version of {@link #readValue(ImmutableBytesWritable, Put, Class)}
      *
      * @param put   HBase's {@link Put} object
      * @param clazz {@link Class} to which you want to convert to (must extend {@link HBRecord} class)
@@ -644,11 +660,11 @@ public class HBObjectMapper {
     /**
      * Converts a list of bean-like objects to a {@link Pair}s of row keys (of type {@link ImmutableBytesWritable}) and HBase's {@link Result} objects
      *
-     * @param objs List of bean-like objects (of type that extends {@link HBRecord})
+     * @param objects List of bean-like objects (of type that extends {@link HBRecord})
      */
-    public List<Pair<ImmutableBytesWritable, Result>> writeValueAsRowKeyResultPair(List<? extends HBRecord> objs) {
-        List<Pair<ImmutableBytesWritable, Result>> pairList = new ArrayList<Pair<ImmutableBytesWritable, Result>>(objs.size());
-        for (HBRecord obj : objs) {
+    public List<Pair<ImmutableBytesWritable, Result>> writeValueAsRowKeyResultPair(List<? extends HBRecord> objects) {
+        List<Pair<ImmutableBytesWritable, Result>> pairList = new ArrayList<Pair<ImmutableBytesWritable, Result>>(objects.size());
+        for (HBRecord obj : objects) {
             pairList.add(writeValueAsRowKeyResultPair(obj));
         }
         return pairList;

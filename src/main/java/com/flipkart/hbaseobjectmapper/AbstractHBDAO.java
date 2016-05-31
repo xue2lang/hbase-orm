@@ -52,11 +52,11 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get a row from HBase table by it's row key
+     * Get specified number of versions of a row from HBase table by it's row key
      *
      * @param rowKey   Row key
      * @param versions Number of versions to be retrieved
-     * @return One HBase row, read as object of you your bean-like class (that implements {@link HBRecord})
+     * @return HBase row, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T get(String rowKey, int versions) throws IOException {
@@ -65,10 +65,10 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get one row from HBase table by it's row key
+     * Get a row from HBase table by it's row key
      *
      * @param rowKey Row key
-     * @return Contents of one row read as your bean-like object (of a class that implements {@link HBRecord})
+     * @return HBase row, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T get(String rowKey) throws IOException {
@@ -77,11 +77,11 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
 
 
     /**
-     * Get rows from an HBase table by array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     * Get specified number of versions of rows from HBase table by array of row keys (This method is a bulk variant of {@link #get(String, int)} method)
      *
      * @param rowKeys  Row keys to fetch
      * @param versions Number of versions of columns to fetch
-     * @return Array of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @return Array of HBase rows, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T[] get(String[] rowKeys, int versions) throws IOException {
@@ -98,10 +98,10 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for an array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     * Get rows from HBase table by array of row keys (This method is a bulk variant of {@link #get(String)} method)
      *
      * @param rowKeys Row keys to fetch
-     * @return Array of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @return Array of HBase rows, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T[] get(String[] rowKeys) throws IOException {
@@ -109,11 +109,11 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for an array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     * Get specified number of versions of rows from HBase table by list of row keys (This method is a multi-version variant of {@link #get(List)} method)
      *
      * @param rowKeys  Row keys to fetch
      * @param versions Number of versions of columns to fetch
-     * @return Array of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @return Array of rows corresponding to row keys passed, deserialized as objects of your bean-like class
      * @throws IOException When HBase call fails
      */
     public List<T> get(List<String> rowKeys, int versions) throws IOException {
@@ -130,10 +130,10 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for an array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     * Get rows from HBase table by list of row keys (This method is a bulk variant of {@link #get(String)} method)
      *
      * @param rowKeys Row keys to fetch
-     * @return List of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @return List of rows corresponding to row keys passed, deserialized as objects of your bean-like class
      * @throws IOException When HBase call fails
      */
     public List<T> get(List<String> rowKeys) throws IOException {
@@ -141,7 +141,13 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for a range of row keys (This method is a bulk variant of {@link #get(String)} method)
+     * Get specified number of versions of rows from HBase table by a range of row keys (start and end) - this is a multi-version variant of {@link #get(String, String)}
+     *
+     * @param startRowKey Row start
+     * @param endRowKey   Row end
+     * @param versions    Number of versions to fetch
+     * @return List of rows corresponding to row keys passed, deserialized as objects of your bean-like class
+     * @throws IOException When HBase call fails
      */
     public List<T> get(String startRowKey, String endRowKey, int versions) throws IOException {
         Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey)).setMaxVersions(versions);
@@ -154,7 +160,12 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for a range of row keys (This method is a bulk variant of {@link #get(String)} method)
+     * Get specified number of versions of rows from HBase table by a range of row keys (start to end)
+     *
+     * @param startRowKey Row start
+     * @param endRowKey   Row end
+     * @return List of rows corresponding to row keys passed, deserialized as objects of your bean-like class
+     * @throws IOException When HBase call fails
      */
     public List<T> get(String startRowKey, String endRowKey) throws IOException {
         return get(startRowKey, endRowKey, DEFAULT_NUM_VERSIONS);
@@ -163,25 +174,29 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     /**
      * Persist your bean-like object (of a class that implements {@link HBRecord}) to HBase table
      *
-     * @param obj Object that needs to be persisted
-     * @return Row key for the object
-     * @throws IOException Thrown if there is an HBase error
+     * @param object Object that needs to be persisted
+     * @return Row key of the persisted object, represented as a {@link String}
+     * @throws IOException When HBase call fails
      */
-    public String persist(HBRecord obj) throws IOException {
-        Put put = hbObjectMapper.writeValueAsPut(obj);
+    public String persist(HBRecord object) throws IOException {
+        Put put = hbObjectMapper.writeValueAsPut(object);
         hTable.put(put);
-        return obj.composeRowKey();
+        return object.composeRowKey();
     }
 
     /**
      * Persist a list of your bean-like objects (of a class that implements {@link HBRecord}) to HBase table (this is a bulk variant of {@link #persist(HBRecord)} method)
+     *
+     * @param objects List of objects that needs to be persisted
+     * @return Row keys of the persisted objects, represented as a {@link String}
+     * @throws IOException When HBase call fails
      */
-    public List<String> persist(List<? extends HBRecord> objs) throws IOException {
-        List<Put> puts = new ArrayList<Put>(objs.size());
-        List<String> rowKeys = new ArrayList<String>(objs.size());
-        for (HBRecord obj : objs) {
-            puts.add(hbObjectMapper.writeValueAsPut(obj));
-            rowKeys.add(obj.composeRowKey());
+    public List<String> persist(List<? extends HBRecord> objects) throws IOException {
+        List<Put> puts = new ArrayList<Put>(objects.size());
+        List<String> rowKeys = new ArrayList<String>(objects.size());
+        for (HBRecord object : objects) {
+            puts.add(hbObjectMapper.writeValueAsPut(object));
+            rowKeys.add(object.composeRowKey());
         }
         hTable.put(puts);
         return rowKeys;
@@ -189,7 +204,10 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
 
 
     /**
-     * Delete row from an HBase table for a given row key
+     * Delete a row from an HBase table for a given row key
+     *
+     * @param rowKey row key to delete
+     * @throws IOException When HBase call fails
      */
     public void delete(String rowKey) throws IOException {
         Delete delete = new Delete(Bytes.toBytes(rowKey));
@@ -197,14 +215,20 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Delete HBase row by row key
+     * Delete HBase row by object (of class that implements {@link HBRecord}
+     *
+     * @param object Object to delete
+     * @throws IOException When HBase call fails
      */
-    public void delete(HBRecord obj) throws IOException {
-        this.delete(obj.composeRowKey());
+    public void delete(HBRecord object) throws IOException {
+        this.delete(object.composeRowKey());
     }
 
     /**
      * Delete HBase rows for an array of row keys
+     *
+     * @param rowKeys row keys to delete
+     * @throws IOException When HBase call fails
      */
     public void delete(String[] rowKeys) throws IOException {
         List<Delete> deletes = new ArrayList<Delete>(rowKeys.length);
@@ -215,18 +239,23 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Delete HBase rows by referencing objects
+     * Delete HBase rows by object references
+     *
+     * @param objects Objects to delete
+     * @throws IOException When HBase call fails
      */
-    public void delete(HBRecord[] objs) throws IOException {
-        String[] rowKeys = new String[objs.length];
-        for (int i = 0; i < objs.length; i++) {
-            rowKeys[i] = objs[i].composeRowKey();
+    public void delete(HBRecord[] objects) throws IOException {
+        String[] rowKeys = new String[objects.length];
+        for (int i = 0; i < objects.length; i++) {
+            rowKeys[i] = objects[i].composeRowKey();
         }
         this.delete(rowKeys);
     }
 
     /**
      * Get HBase table name
+     *
+     * @return Name of table read as String
      */
     public String getTableName() {
         HBTable hbTable = hbRecordClass.getAnnotation(HBTable.class);
@@ -283,9 +312,9 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      * Fetch value of column for a given row key and field
      *
      * @param rowKey    Row key to reference HBase row
-     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord})
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
      * @return Value of the column (boxed), <code>null</code> if row with given rowKey doesn't exist or such field doesn't exist for the row
-     * @throws IOException Thrown when there is an exception from HBase
+     * @throws IOException When HBase call fails
      */
     public Object fetchFieldValue(String rowKey, String fieldName) throws IOException {
         final NavigableMap<Long, Object> fieldValues = fetchFieldValue(rowKey, fieldName, 1);
@@ -294,12 +323,27 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
 
+    /**
+     * Fetch multiple versions of column values by row key and field name
+     *
+     * @param rowKey    Row key to reference HBase row
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
+     * @param versions  Number of versions of column to fetch
+     * @return {@link NavigableMap} of timestamps and values of the column (boxed), <code>null</code> if row with given rowKey doesn't exist or such field doesn't exist for the row
+     * @throws IOException When HBase call fails
+     */
     public NavigableMap<Long, Object> fetchFieldValue(String rowKey, String fieldName, int versions) throws IOException {
         return fetchFieldValues(new String[]{rowKey}, fieldName, versions).get(rowKey);
     }
 
     /**
-     * Fetch column values for a given range of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
+     * Fetch values of an HBase column for a range of row keys (start and end) and field name
+     *
+     * @param startRowKey Start row key (scan start)
+     * @param endRowKey   End row key (scan end)
+     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
+     * @return Map of row key and column value
+     * @throws IOException When HBase call fails
      */
     public Map<String, Object> fetchFieldValues(String startRowKey, String endRowKey, String fieldName) throws IOException {
         final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, 1);
@@ -314,6 +358,16 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return map;
     }
 
+    /**
+     * Fetch specified number of versions of values of an HBase column for a range of row keys (start and end) and field name
+     *
+     * @param startRowKey Start row key (scan start)
+     * @param endRowKey   End row key (scan end)
+     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
+     * @param versions    Number of versions of column to fetch
+     * @return Map of row key and column values (versioned)
+     * @throws IOException When HBase call fails
+     */
     public NavigableMap<String, NavigableMap<Long, Object>> fetchFieldValues(String startRowKey, String endRowKey, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
@@ -330,12 +384,26 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
 
     /**
      * Fetch column values for a given array of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
+     *
+     * @param rowKeys   Array of row keys to fetch
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
+     * @return Map of row key and column values
+     * @throws IOException
      */
     public Map<String, Object> fetchFieldValues(String[] rowKeys, String fieldName) throws IOException {
         final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, 1);
         return toSingleVersioned(multiVersionedMap, rowKeys.length);
     }
 
+    /**
+     * Fetch specified number of versions of values of an HBase column for an array of row keys
+     *
+     * @param rowKeys   Array of row keys to fetch
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
+     * @param versions  Number of versions of column to fetch
+     * @return Map of row key and column values (versioned)
+     * @throws IOException When HBase call fails
+     */
     public Map<String, NavigableMap<Long, Object>> fetchFieldValues(String[] rowKeys, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
