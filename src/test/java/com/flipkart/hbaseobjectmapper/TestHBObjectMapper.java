@@ -14,7 +14,8 @@ import static com.flipkart.hbaseobjectmapper.TestUtil.triplet;
 import static org.junit.Assert.*;
 
 public class TestHBObjectMapper {
-    List<Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>> invalidRecordsAndErrorMessages = Arrays.asList(
+    @SuppressWarnings("unchecked")
+    final List<Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>> invalidRecordsAndErrorMessages = Arrays.asList(
             triplet(Singleton.getInstance(), "A singleton class", EmptyConstructorInaccessibleException.class),
             triplet(new ClassWithNoEmptyConstructor(1), "Class with no empty constructor", NoEmptyConstructorException.class),
             triplet(new ClassWithPrimitives(1f), "A class with primitives", MappedColumnCantBePrimitiveException.class),
@@ -28,11 +29,11 @@ public class TestHBObjectMapper {
             triplet(new ClassesWithFieldIncomptibleWithHBColumnMultiVersion.EntryKeyNotLong(), "Class with an incompatible field (NavigableMap's entry key not Long) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class)
     );
 
-    HBObjectMapper hbMapper = new HBObjectMapper();
-    List<Citizen> validObjs = TestObjects.validObjs;
+    final HBObjectMapper hbMapper = new HBObjectMapper();
+    final List<Citizen> validObjs = TestObjects.validObjs;
 
-    Result someResult = hbMapper.writeValueAsResult(validObjs.get(0));
-    Put somePut = hbMapper.writeValueAsPut(validObjs.get(0));
+    final Result someResult = hbMapper.writeValueAsResult(validObjs.get(0));
+    final Put somePut = hbMapper.writeValueAsPut(validObjs.get(0));
 
     @Test
     public void testHBObjectMapper() {
@@ -60,7 +61,7 @@ public class TestHBObjectMapper {
 
     public void testResultWithRow(HBRecord p) {
         long start, end;
-        Result result = hbMapper.writeValueAsResult(Arrays.asList(p)).get(0);
+        Result result = hbMapper.writeValueAsResult(Arrays.asList(p, p)).get(0);
         ImmutableBytesWritable rowKey = Util.strToIbw(p.composeRowKey());
         start = System.currentTimeMillis();
         Citizen pFromResult = hbMapper.readValue(rowKey, result, Citizen.class);
@@ -72,7 +73,7 @@ public class TestHBObjectMapper {
     public void testPut(HBRecord p) {
         long start, end;
         start = System.currentTimeMillis();
-        Put put = hbMapper.writeValueAsPut(Arrays.asList(p)).get(0);
+        Put put = hbMapper.writeValueAsPut(Arrays.asList(p, p)).get(0);
         end = System.currentTimeMillis();
         System.out.printf("Time taken for POJO->Put = %dms%n", end - start);
         start = System.currentTimeMillis();
@@ -190,6 +191,7 @@ public class TestHBObjectMapper {
     }
 
     @Test
+    @SuppressWarnings("ConstantConditions")
     public void testEmptyResults() {
         Result nullResult = null, blankResult = new Result(), emptyResult = Result.EMPTY_RESULT;
         Citizen nullCitizen = hbMapper.readValue(nullResult, Citizen.class);
@@ -200,6 +202,7 @@ public class TestHBObjectMapper {
     }
 
     @Test
+    @SuppressWarnings("ConstantConditions")
     public void testEmptyPuts() {
         Put nullPut = null;
         Citizen nullCitizen = hbMapper.readValue(nullPut, Citizen.class);
@@ -266,7 +269,7 @@ public class TestHBObjectMapper {
             hbMapper.readValue(someResult, UninstantiatableClass.class);
             fail("If class can't be instantiated, a " + ObjectNotInstantiatableException.class.getName() + " was expected");
         } catch (ObjectNotInstantiatableException e) {
-
+            // Expected
         }
     }
 

@@ -1,5 +1,6 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.codec.DeserializationException;
 import com.flipkart.hbaseobjectmapper.exceptions.FieldNotMappedToHBaseColumnException;
 import com.google.common.reflect.TypeToken;
 import org.apache.hadoop.conf.Configuration;
@@ -11,7 +12,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 
 /**
@@ -21,7 +22,10 @@ import java.util.*;
  */
 public abstract class AbstractHBDAO<T extends HBRecord> {
 
-    public static final int DEFAULT_NUM_VERSIONS = 1;
+    /**
+     * Default number of versions to fetch
+     */
+    private static final int DEFAULT_NUM_VERSIONS = 1;
     protected static final HBObjectMapper hbObjectMapper = new HBObjectMapper();
     protected final HTable hTable;
     @SuppressWarnings("FieldCanBeLocal")
@@ -48,11 +52,11 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get one row from HBase table by it's row key
+     * Get a row from HBase table by it's row key
      *
      * @param rowKey   Row key
-     * @param versions Number of versions to be retrieved (default value: {@link #DEFAULT_NUM_VERSIONS})
-     * @return Contents of one row read as your bean-like object (of a class that implements {@link HBRecord})
+     * @param versions Number of versions to be retrieved
+     * @return One HBase row, read as object of you your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T get(String rowKey, int versions) throws IOException {
@@ -73,7 +77,12 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
 
 
     /**
-     * Get multiple rows from HBase table for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     * Get rows from an HBase table by array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     *
+     * @param rowKeys  Row keys to fetch
+     * @param versions Number of versions of columns to fetch
+     * @return Array of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @throws IOException When HBase call fails
      */
     public T[] get(String[] rowKeys, int versions) throws IOException {
         List<Get> gets = new ArrayList<Get>(rowKeys.length);
@@ -89,14 +98,23 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     * Get multiple rows from HBase table in one shot for an array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     *
+     * @param rowKeys Row keys to fetch
+     * @return Array of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @throws IOException When HBase call fails
      */
     public T[] get(String[] rowKeys) throws IOException {
         return get(rowKeys, DEFAULT_NUM_VERSIONS);
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     * Get multiple rows from HBase table in one shot for an array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     *
+     * @param rowKeys  Row keys to fetch
+     * @param versions Number of versions of columns to fetch
+     * @return Array of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @throws IOException When HBase call fails
      */
     public List<T> get(List<String> rowKeys, int versions) throws IOException {
         List<Get> gets = new ArrayList<Get>(rowKeys.size());
@@ -112,14 +130,18 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for an array of row keys (This API is a bulk variant of {@link #get(String)} method)
+     * Get multiple rows from HBase table in one shot for an array of row keys (This method is a bulk variant of {@link #get(String)} method)
+     *
+     * @param rowKeys Row keys to fetch
+     * @return List of rows corresponding to row keys passed, deserialised as object of your bean-like class
+     * @throws IOException When HBase call fails
      */
     public List<T> get(List<String> rowKeys) throws IOException {
         return get(rowKeys, DEFAULT_NUM_VERSIONS);
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for a range of row keys (This API is a bulk variant of {@link #get(String)} method)
+     * Get multiple rows from HBase table in one shot for a range of row keys (This method is a bulk variant of {@link #get(String)} method)
      */
     public List<T> get(String startRowKey, String endRowKey, int versions) throws IOException {
         Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey)).setMaxVersions(versions);
@@ -132,7 +154,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
     }
 
     /**
-     * Get multiple rows from HBase table in one shot for a range of row keys (This API is a bulk variant of {@link #get(String)} method)
+     * Get multiple rows from HBase table in one shot for a range of row keys (This method is a bulk variant of {@link #get(String)} method)
      */
     public List<T> get(String startRowKey, String endRowKey) throws IOException {
         return get(startRowKey, endRowKey, DEFAULT_NUM_VERSIONS);
@@ -243,13 +265,13 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return field;
     }
 
-    private static void populateFieldValuesToMap(Field field, Result result, Map<String, NavigableMap<Long, Object>> map) {
+    private static void populateFieldValuesToMap(Field field, Result result, Map<String, NavigableMap<Long, Object>> map) throws DeserializationException {
         if (result.isEmpty())
             return;
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         List<Cell> cells = result.getColumnCells(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         for (Cell cell : cells) {
-            Class<?> fieldType = hbColumn.isMultiVersioned() ? (Class) ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1] : field.getType();
+            Type fieldType = hbColumn.isMultiVersioned() ? hbObjectMapper.getComponentType(field) : field.getType();
             final String rowKey = Bytes.toString(CellUtil.cloneRow(cell));
             if (!map.containsKey(rowKey))
                 map.put(rowKey, new TreeMap<Long, Object>());
@@ -266,21 +288,21 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      * @throws IOException Thrown when there is an exception from HBase
      */
     public Object fetchFieldValue(String rowKey, String fieldName) throws IOException {
-        final NavigableMap<Long, Object> fieldValues = fetchFieldValueVersioned(rowKey, fieldName, 1);
+        final NavigableMap<Long, Object> fieldValues = fetchFieldValue(rowKey, fieldName, 1);
         if (fieldValues == null || fieldValues.isEmpty()) return null;
         else return fieldValues.lastEntry().getValue();
     }
 
 
-    public NavigableMap<Long, Object> fetchFieldValueVersioned(String rowKey, String fieldName, int versions) throws IOException {
-        return fetchFieldValuesVersioned(new String[]{rowKey}, fieldName, versions).get(rowKey);
+    public NavigableMap<Long, Object> fetchFieldValue(String rowKey, String fieldName, int versions) throws IOException {
+        return fetchFieldValues(new String[]{rowKey}, fieldName, versions).get(rowKey);
     }
 
     /**
      * Fetch column values for a given range of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String startRowKey, String endRowKey, String fieldName) throws IOException {
-        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValuesVersioned(startRowKey, endRowKey, fieldName, 1);
+        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, 1);
         return toSingleVersioned(multiVersionedMap, 10);
     }
 
@@ -292,7 +314,7 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
         return map;
     }
 
-    public NavigableMap<String, NavigableMap<Long, Object>> fetchFieldValuesVersioned(String startRowKey, String endRowKey, String fieldName, int versions) throws IOException {
+    public NavigableMap<String, NavigableMap<Long, Object>> fetchFieldValues(String startRowKey, String endRowKey, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         Scan scan = new Scan(Bytes.toBytes(startRowKey), Bytes.toBytes(endRowKey));
@@ -310,11 +332,11 @@ public abstract class AbstractHBDAO<T extends HBRecord> {
      * Fetch column values for a given array of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      */
     public Map<String, Object> fetchFieldValues(String[] rowKeys, String fieldName) throws IOException {
-        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValuesVersioned(rowKeys, fieldName, 1);
+        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, 1);
         return toSingleVersioned(multiVersionedMap, rowKeys.length);
     }
 
-    public Map<String, NavigableMap<Long, Object>> fetchFieldValuesVersioned(String[] rowKeys, String fieldName, int versions) throws IOException {
+    public Map<String, NavigableMap<Long, Object>> fetchFieldValues(String[] rowKeys, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         if (!hbColumn.isPresent()) {

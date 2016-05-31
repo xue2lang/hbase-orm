@@ -1,8 +1,9 @@
 package com.flipkart.hbaseobjectmapper;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flipkart.hbaseobjectmapper.codec.Codec;
+import com.flipkart.hbaseobjectmapper.codec.DeserializationException;
+import com.flipkart.hbaseobjectmapper.codec.JacksonJsonCodec;
+import com.flipkart.hbaseobjectmapper.codec.SerializationException;
 import com.flipkart.hbaseobjectmapper.exceptions.*;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -16,7 +17,6 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
-import java.io.IOException;
 import java.lang.reflect.*;
 import java.math.BigDecimal;
 import java.util.*;
@@ -75,14 +75,14 @@ public class HBObjectMapper {
         }
     }
 
-    private final ObjectMapper objectMapper;
+    private final Codec codec;
 
-    public HBObjectMapper(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public HBObjectMapper(Codec codec) {
+        this.codec = codec;
     }
 
     public HBObjectMapper() {
-        this(new ObjectMapper());
+        this(new JacksonJsonCodec());
     }
 
     private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
@@ -130,21 +130,18 @@ public class HBObjectMapper {
         }
     }
 
-    private byte[] valueToByteArray(Class<?> clazz, Object value, boolean serializeAsString) {
+    private byte[] valueToByteArray(Object value, boolean serializeAsString) {
         try {
             if (value == null)
                 return null;
+            Class clazz = value.getClass();
             if (toBytesMethods.containsKey(clazz.getName())) {
                 Method toBytesMethod = toBytesMethods.get(clazz.getName());
                 return serializeAsString ? Bytes.toBytes(String.valueOf(value)) : (byte[]) toBytesMethod.invoke(null, value);
             } else {
                 try {
-                    if (serializeAsString)
-                        return Bytes.toBytes(objectMapper.writeValueAsString(value));
-                    else
-                        return objectMapper.writeValueAsBytes(value);
-
-                } catch (JsonProcessingException jpx) {
+                    return codec.serialize(value);
+                } catch (SerializationException jpx) {
                     throw new ConversionFailedException(String.format("Don't know how to convert field of type %s to byte array", clazz.getName()));
                 }
             }
@@ -197,6 +194,9 @@ public class HBObjectMapper {
         }
     }
 
+    /**
+     * Keep this in sync with {@link #getComponentType}
+     */
     private void validateHBColumnMultiVersionField(Field field) {
         validateHBColumnField(field);
         if (!(field.getGenericType() instanceof ParameterizedType)) {
@@ -208,8 +208,15 @@ public class HBObjectMapper {
         ParameterizedType pType = (ParameterizedType) field.getGenericType();
         Type[] typeArguments = pType.getActualTypeArguments();
         if (typeArguments.length != 2 || typeArguments[0] != Long.class) {
-            throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " has unexpected type params");
+            throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " has unexpected type params (Key should be of " + Long.class.getName() + " type)");
         }
+    }
+
+    /**
+     * Keep this in sync with {@link #validateHBColumnMultiVersionField(Field)}
+     */
+    Type getComponentType(Field field) {
+        return ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1];
     }
 
     private <T extends HBRecord> void validateHBColumnField(Field field) {
@@ -228,8 +235,7 @@ public class HBObjectMapper {
             String suggestion = nativeCounterParts.containsValue(fieldClazz) ? String.format("- Use type %s instead", nativeCounterParts.inverse().get(fieldClazz).getName()) : "";
             throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable) %s", field.getName(), clazz.getName(), fieldClazz.getName(), suggestion));
         }
-        JavaType javaType = objectMapper.constructType(field.getGenericType());
-        if (!objectMapper.canDeserialize(javaType)) {
+        if (!codec.canDeserialize(field.getGenericType())) {
             throw new UnsupportedFieldTypeException(String.format("Field %s in class %s is of unsupported type (%s)", field.getName(), clazz.getName(), fieldClazz.getName()));
         }
     }
@@ -290,12 +296,10 @@ public class HBObjectMapper {
         } catch (IllegalAccessException e) {
             throw new BadHBaseLibStateException(e);
         }
-        return valueToByteArray(field.getType(), fieldValue, serializeAsString);
+        return valueToByteArray(fieldValue, serializeAsString);
     }
 
     private NavigableMap<Long, byte[]> getFieldValuesVersioned(Field field, HBRecord obj, boolean serializeAsString) {
-        ParameterizedType fieldNavigableMapType = ((ParameterizedType) field.getGenericType());
-        Class<?> fieldType = objectMapper.constructType(fieldNavigableMapType).getContentType().getRawClass();
         try {
             field.setAccessible(true);
             @SuppressWarnings("unchecked")
@@ -311,7 +315,7 @@ public class HBObjectMapper {
                 Object fieldValue = e.getValue();
                 if (fieldValue == null)
                     continue;
-                byte[] fieldValueBytes = valueToByteArray(fieldType, fieldValue, serializeAsString);
+                byte[] fieldValueBytes = valueToByteArray(fieldValue, serializeAsString);
                 output.put(timestamp, fieldValueBytes);
             }
             return output;
@@ -321,7 +325,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts a bean-like object to HBase's {@link Put} object. For use in reducer jobs that extend HBase's {@link org.apache.hadoop.hbase.mapreduce.TableReducer TableReducer}
+     * Converts a bean-like object to HBase's {@link Put} object. For use in reducer jobs that extend HBase's <code>org.apache.hadoop.hbase.mapreduce.TableReducer</code> class
      *
      * @param obj bean-like object (of type that extends {@link HBRecord})
      * @return HBase's {@link Put} object
@@ -359,7 +363,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts a bean-like object to HBase's {@link Result} object. For use in unit-tests of mapper jobs that extend {@link org.apache.hadoop.hbase.mapreduce.TableMapper TableMapper}
+     * Converts a bean-like object to HBase's {@link Result} object. For use in unit-tests of mapper jobs that extend <code>org.apache.hadoop.hbase.mapreduce.TableMapper</code> class
      *
      * @param obj bean-like object (of type that extends {@link HBRecord})
      * @return HBase's {@link Result} object
@@ -398,7 +402,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts HBase's {@link Result} object to a bean-like object. For use in  mapper jobs that extend {@link org.apache.hadoop.hbase.mapreduce.TableMapper TableMapper}
+     * Converts HBase's {@link Result} object to a bean-like object. For use in  mapper jobs that extend <code>org.apache.hadoop.hbase.mapreduce.TableMapper</code> class
      *
      * @param rowKey Row key of the record that corresponds to {@link Result}. If this is <code>null</code>, an attempt will be made to resolve it from {@link Result}
      * @param result HBase's {@link Result} object
@@ -458,9 +462,8 @@ public class HBObjectMapper {
         try {
             field.setAccessible(true);
             NavigableMap<Long, Object> columnValuesVersionedBoxed = new TreeMap<Long, Object>();
-            Class<?> fieldType = objectMapper.constructType(field.getGenericType()).getContentType().getRawClass();
             for (NavigableMap.Entry<Long, byte[]> versionAndValue : columnValuesVersioned.entrySet()) {
-                columnValuesVersionedBoxed.put(versionAndValue.getKey(), byteArrayToValue(versionAndValue.getValue(), fieldType, serializeAsString));
+                columnValuesVersionedBoxed.put(versionAndValue.getKey(), byteArrayToValue(versionAndValue.getValue(), ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1], serializeAsString));
             }
             field.set(obj, columnValuesVersionedBoxed);
         } catch (Exception ex) {
@@ -483,33 +486,26 @@ public class HBObjectMapper {
     /**
      * Convert a byte array representing HBase column data to appropriate data type (boxed as object)
      */
-    Object byteArrayToValue(byte[] value, Class<?> fieldClazz, boolean serializeAsString) {
+    Object byteArrayToValue(byte[] value, Type type, boolean serializeAsString) throws DeserializationException {
         if (value == null || value.length == 0)
             return null;
         Object fieldValue;
         try {
-            if (fromBytesMethods.containsKey(fieldClazz.getName())) {
+            if (type instanceof Class && fromBytesMethods.containsKey(((Class) type).getName())) {
+                String className = ((Class) type).getName();
                 if (serializeAsString) {
-                    Constructor constructor = constructors.get(fieldClazz.getName());
+                    Constructor constructor = constructors.get(className);
                     try {
                         fieldValue = constructor.newInstance(Bytes.toString(value));
                     } catch (Exception ex) {
                         fieldValue = null;
                     }
                 } else {
-                    Method method = fromBytesMethods.get(fieldClazz.getName());
+                    Method method = fromBytesMethods.get(className);
                     fieldValue = method.invoke(null, new Object[]{value});
                 }
             } else {
-                try {
-                    JavaType fieldType = objectMapper.constructType(fieldClazz);
-                    if (serializeAsString)
-                        return objectMapper.readValue(Bytes.toString(value), fieldType);
-                    else
-                        return objectMapper.readValue(value, fieldType);
-                } catch (IOException e) {
-                    throw new CouldNotDeserializeException(e);
-                }
+                return codec.deserialize(value, type);
             }
             return fieldValue;
         } catch (IllegalAccessException e) {
@@ -520,7 +516,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Converts HBase's {@link Put} object to a bean-like object. For unit-testing reducer jobs that extend {@link org.apache.hadoop.hbase.mapreduce.TableReducer TableReducer}
+     * Converts HBase's {@link Put} object to a bean-like object. For unit-testing reducer jobs that extend <code>org.apache.hadoop.hbase.mapreduce.TableReducer</code> class
      *
      * @param rowKeyBytes Row key of the record that corresponds to {@link Put}. If this is <code>null</code>, an attempt will be made to resolve it from {@link Put} object
      * @param put         HBase's {@link Put} object
@@ -592,8 +588,8 @@ public class HBObjectMapper {
      * Get row key (for use in HBase) from a bean-line object.<br>
      * For use in:
      * <ul>
-     * <li>reducer jobs that extend HBase's {@link org.apache.hadoop.hbase.mapreduce.TableReducer TableReducer}</li>
-     * <li>unit tests for mapper jobs that extend HBase's {@link org.apache.hadoop.hbase.mapreduce.TableMapper TableMapper}</li>
+     * <li>reducer jobs that extend HBase's <code>org.apache.hadoop.hbase.mapreduce.TableReducer</code> class</li>
+     * <li>unit tests for mapper jobs that extend HBase's <code>org.apache.hadoop.hbase.mapreduce.TableMapper</code> class</li>
      * </ul>
      *
      * @param obj bean-like object (of type that extends {@link HBRecord})

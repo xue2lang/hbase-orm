@@ -28,7 +28,7 @@ public class TestObjects {
             new Citizen("IND", 102, "Sathish", (short) 28, null, false, 2.3f, 4.33, -34L, new BigDecimal(100), 560034, null, new HashMap<String, Integer>(), new Dependents(131, null)),
             new Citizen("IND", 103, "Akshay", (short) -1, 50000, false, null, 4.33e34, 34L, null, 560034, null, null, null),
             new Citizen("IND", 104, "Ananda", (short) 5, 30000, null, -2.3f, 4.33, 34L, new BigDecimal(1e50), 560034, null, null, new Dependents()),
-            new Citizen("IND", 105, "Nilesh", null, null, null, null, null, null, null, null, null, null, new Dependents(null, Arrays.asList(141)))
+            new Citizen("IND", 105, "Nilesh", null, null, null, null, null, null, null, null, null, null, new Dependents(null, Arrays.asList(141, 142)))
     );
 
     public static final List<Citizen> validObjsWithHBColumnMultiVersion = Arrays.asList(
@@ -52,6 +52,7 @@ public class TestObjects {
             addAll(TestObjects.validObjsWithHBColumnMultiVersion);
         }
     };
+    @SuppressWarnings("unchecked")
     public static final List<Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>> invalidObjs = Arrays.asList(
             triplet(new Citizen("IND", -1, null, null, null, null, null, null, null, null, null, null, null, null), "all fields empty", AllHBColumnFieldsNullException.class),
             triplet(new Citizen(null, -2, "row key field null 1", null, null, null, null, null, null, null, null, null, null, null), "one row key field null (variant 1)", HBRowKeyFieldCantBeNullException.class),

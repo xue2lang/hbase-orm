@@ -23,13 +23,13 @@ import java.util.concurrent.*;
 import static org.junit.Assert.*;
 
 public class TestsAbstractHBDAO {
-    HBaseTestingUtility utility = new HBaseTestingUtility();
+    final HBaseTestingUtility utility = new HBaseTestingUtility();
     Configuration configuration;
     CitizenDAO citizenDao;
     CitizenSummaryDAO citizenSummaryDAO;
     CrawlDAO crawlDAO;
     CrawlNoVersionDAO crawlNoVersionDAO;
-    List<Citizen> testObjs = TestObjects.validObjsNoVersion;
+    final List<Citizen> testObjs = TestObjects.validObjsNoVersion;
     final static long CLUSTER_START_TIMEOUT = 30;
 
     class ClusterStarter implements Callable<MiniHBaseCluster> {
@@ -51,7 +51,7 @@ public class TestsAbstractHBDAO {
     }
 
     private static class ActualTablesCreator implements TablesCreator {
-        private HBaseAdmin hBaseAdmin;
+        private final HBaseAdmin hBaseAdmin;
 
         private ActualTablesCreator(HBaseAdmin hBaseAdmin) {
             this.hBaseAdmin = hBaseAdmin;
@@ -67,7 +67,7 @@ public class TestsAbstractHBDAO {
                 hBaseAdmin.deleteTable(tableName);
                 System.out.println("[DONE]");
             }
-            HTableDescriptor tableDescriptor = new HTableDescriptor(tableName);
+            HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
             for (String columnFamily : columnFamilies) {
                 tableDescriptor.addFamily(new HColumnDescriptor(columnFamily).setMaxVersions(numVersions));
             }
@@ -79,7 +79,7 @@ public class TestsAbstractHBDAO {
 
     private static class InMemoryTablesCreator implements TablesCreator {
 
-        private HBaseTestingUtility utility;
+        private final HBaseTestingUtility utility;
 
         private InMemoryTablesCreator(HBaseTestingUtility utility) {
             this.utility = utility;
@@ -251,6 +251,14 @@ public class TestsAbstractHBDAO {
         CrawlNoVersion crawlNoVersion = crawlNoVersionDAO.get("key2");
         assertEquals("Entry with the highest version (i.e. timestamp) isn't the one that was returned by DAO get", crawlNoVersion.getF1(), testNumbers[testNumbers.length - 1]);
         assertArrayEquals("Issue with version history implementation when written as versioned and read as unversioned", testNumbersOfRange, crawlDAO.get("key2", NUM_VERSIONS).getF1().values().toArray());
+
+        for (int v = 0; v <= 9; v++) {
+            for (int k = 1; k <= 4; k++) {
+                crawlDAO.persist(new Crawl("oKey" + k).addF1((double) v));
+            }
+        }
+        System.out.println(crawlDAO.fetchFieldValues("oKey0", "oKey9", "f1", 2));
+
         // Deletion tests:
 
         // Written as unversioned, deleted as unversioned:
@@ -276,6 +284,7 @@ public class TestsAbstractHBDAO {
         crawlDAO.persist(new Crawl(deleteKey4).addF1(10.04));
         crawlNoVersionDAO.delete(deleteKey4);
         assertNull("Row with key '" + deleteKey4 + "' exists, when written through versioned DAO and deleted through unversioned DAO!", crawlNoVersionDAO.get(deleteKey4));
+
     }
 
 
