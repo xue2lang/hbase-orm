@@ -29,7 +29,7 @@ public class TestsAbstractHBDAO {
     CitizenSummaryDAO citizenSummaryDAO;
     CrawlDAO crawlDAO;
     CrawlNoVersionDAO crawlNoVersionDAO;
-    final List<Citizen> testObjs = TestObjects.validObjsNoVersion;
+    final List<Citizen> testObjs = TestObjects.validObjectsNoVersion;
     final static long CLUSTER_START_TIMEOUT = 30;
 
     class ClusterStarter implements Callable<MiniHBaseCluster> {

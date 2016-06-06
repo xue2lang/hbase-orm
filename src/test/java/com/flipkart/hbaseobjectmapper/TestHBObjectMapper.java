@@ -30,7 +30,7 @@ public class TestHBObjectMapper {
     );
 
     final HBObjectMapper hbMapper = new HBObjectMapper();
-    final List<Citizen> validObjs = TestObjects.validObjs;
+    final List<Citizen> validObjs = TestObjects.validObjects;
 
     final Result someResult = hbMapper.writeValueAsResult(validObjs.get(0));
     final Put somePut = hbMapper.writeValueAsPut(validObjs.get(0));
@@ -96,7 +96,7 @@ public class TestHBObjectMapper {
 
     @Test
     public void testInvalidRowKey() {
-        Citizen e = TestObjects.validObjs.get(0);
+        Citizen e = TestObjects.validObjects.get(0);
         try {
             hbMapper.readValue("invalid row key", hbMapper.writeValueAsPut(e), Citizen.class);
             fail("Invalid row key should've thrown " + RowKeyCouldNotBeParsedException.class.getName());
@@ -172,7 +172,7 @@ public class TestHBObjectMapper {
 
     @Test
     public void testInvalidObjs() {
-        for (Triplet<HBRecord, String, Class<? extends IllegalArgumentException>> p : TestObjects.invalidObjs) {
+        for (Triplet<HBRecord, String, Class<? extends IllegalArgumentException>> p : TestObjects.invalidObjects) {
             HBRecord record = p.getValue0();
             String errorMessage = "An object with " + p.getValue1() + " should've thrown an " + p.getValue2().getName();
             try {

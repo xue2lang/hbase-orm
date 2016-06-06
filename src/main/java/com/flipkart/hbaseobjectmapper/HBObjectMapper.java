@@ -1,9 +1,6 @@
 package com.flipkart.hbaseobjectmapper;
 
-import com.flipkart.hbaseobjectmapper.codec.Codec;
-import com.flipkart.hbaseobjectmapper.codec.DeserializationException;
-import com.flipkart.hbaseobjectmapper.codec.JacksonJsonCodec;
-import com.flipkart.hbaseobjectmapper.codec.SerializationException;
+import com.flipkart.hbaseobjectmapper.codec.*;
 import com.flipkart.hbaseobjectmapper.exceptions.*;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -17,6 +14,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
+import java.io.Serializable;
 import java.lang.reflect.*;
 import java.math.BigDecimal;
 import java.util.*;
@@ -27,6 +25,8 @@ import java.util.*;
  * <p>This class is thread-safe</p>
  */
 public class HBObjectMapper {
+
+    private static final Codec DEFAULT_CODEC = new JacksonJsonCodec();
 
     private static final Map<Class, String> fromBytesMethodNames = new HashMap<Class, String>() {
         {
@@ -92,7 +92,7 @@ public class HBObjectMapper {
      * Instantiate an object of this class with default {@link Codec} of {@link JacksonJsonCodec}
      */
     public HBObjectMapper() {
-        this(new JacksonJsonCodec());
+        this(DEFAULT_CODEC);
     }
 
     private <T extends HBRecord> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
@@ -140,11 +140,11 @@ public class HBObjectMapper {
         }
     }
 
-    private byte[] valueToByteArray(Object value, boolean serializeAsString) {
+    private byte[] valueToByteArray(Serializable value, boolean serializeAsString) {
         try {
             if (value == null)
                 return null;
-            Class clazz = value.getClass();
+            Class<? extends Serializable> clazz = value.getClass();
             if (toBytesMethods.containsKey(clazz.getName())) {
                 Method toBytesMethod = toBytesMethods.get(clazz.getName());
                 return serializeAsString ? Bytes.toBytes(String.valueOf(value)) : (byte[]) toBytesMethod.invoke(null, value);
@@ -299,10 +299,10 @@ public class HBObjectMapper {
     }
 
     private byte[] getFieldValueAsBytes(HBRecord obj, Field field, boolean serializeAsString) {
-        Object fieldValue;
+        Serializable fieldValue;
         try {
             field.setAccessible(true);
-            fieldValue = field.get(obj);
+            fieldValue = (Serializable) field.get(obj);
         } catch (IllegalAccessException e) {
             throw new BadHBaseLibStateException(e);
         }
@@ -313,16 +313,16 @@ public class HBObjectMapper {
         try {
             field.setAccessible(true);
             @SuppressWarnings("unchecked")
-            NavigableMap<Long, Object> fieldValueVersions = (NavigableMap<Long, Object>) field.get(obj);
+            NavigableMap<Long, Serializable> fieldValueVersions = (NavigableMap<Long, Serializable>) field.get(obj);
             if (fieldValueVersions == null)
                 return null;
             if (fieldValueVersions.size() == 0) {
                 throw new FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty();
             }
             NavigableMap<Long, byte[]> output = new TreeMap<Long, byte[]>();
-            for (NavigableMap.Entry<Long, Object> e : fieldValueVersions.entrySet()) {
+            for (NavigableMap.Entry<Long, Serializable> e : fieldValueVersions.entrySet()) {
                 Long timestamp = e.getKey();
-                Object fieldValue = e.getValue();
+                Serializable fieldValue = e.getValue();
                 if (fieldValue == null)
                     continue;
                 byte[] fieldValueBytes = valueToByteArray(fieldValue, serializeAsString);

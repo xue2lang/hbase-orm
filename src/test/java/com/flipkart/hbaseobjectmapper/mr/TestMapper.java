@@ -31,7 +31,7 @@ public class TestMapper extends AbstractMRTest {
 
     @Test
     public void testSingle() throws IOException {
-        Citizen citizen = TestObjects.validObjs.get(0);
+        Citizen citizen = TestObjects.validObjects.get(0);
         mapDriver
                 .withInput(
                         hbObjectMapper.getRowKey(citizen),
@@ -44,7 +44,7 @@ public class TestMapper extends AbstractMRTest {
 
     @Test
     public void testMultiple() throws IOException {
-        List<Pair<ImmutableBytesWritable, Result>> citizens = TestUtil.writeValueAsRowKeyResultPair(TestObjects.validObjs);
+        List<Pair<ImmutableBytesWritable, Result>> citizens = TestUtil.writeValueAsRowKeyResultPair(TestObjects.validObjects);
         List<Pair<ImmutableBytesWritable, IntWritable>> mapResults = mapDriver.withAll(citizens).run();
         for (Pair<ImmutableBytesWritable, IntWritable> mapResult : mapResults) {
             assertEquals(Util.ibwToStr(mapResult.getFirst()), "key");

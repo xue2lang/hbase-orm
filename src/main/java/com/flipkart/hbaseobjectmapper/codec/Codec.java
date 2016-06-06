@@ -1,6 +1,7 @@
 package com.flipkart.hbaseobjectmapper.codec;
 
 
+import java.io.Serializable;
 import java.lang.reflect.Type;
 
 /**
@@ -14,7 +15,7 @@ public interface Codec {
      * @return byte array - this would be used as is in setting column value
      * @throws SerializationException If serialization fails (e.g. classes uses a type that isn't serializable by this codec)
      */
-    byte[] serialize(Object object) throws SerializationException;
+    byte[] serialize(Serializable object) throws SerializationException;
 
     /**
      * Deserialize <code>byte[]</code> into object
@@ -24,7 +25,7 @@ public interface Codec {
      * @return object
      * @throws DeserializationException If deserialization fails (e.g. malformed string or definition of a type used isn't available at runtime)
      */
-    Object deserialize(byte[] bytes, Type type) throws DeserializationException;
+    Serializable deserialize(byte[] bytes, Type type) throws DeserializationException;
 
     /**
      * Check whether a specific type can be deserialized using this codec

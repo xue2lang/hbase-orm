@@ -3,6 +3,7 @@ package com.flipkart.hbaseobjectmapper.codec;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.Serializable;
 import java.lang.reflect.Type;
 
 public class JacksonJsonCodec implements Codec {
@@ -10,7 +11,7 @@ public class JacksonJsonCodec implements Codec {
     protected final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    public byte[] serialize(Object object) throws SerializationException {
+    public byte[] serialize(Serializable object) throws SerializationException {
         try {
             return objectMapper.writeValueAsBytes(object);
         } catch (Exception e) {
@@ -19,7 +20,7 @@ public class JacksonJsonCodec implements Codec {
     }
 
     @Override
-    public Object deserialize(byte[] bytes, Type type) throws DeserializationException {
+    public Serializable deserialize(byte[] bytes, Type type) throws DeserializationException {
         try {
             return objectMapper.readValue(bytes, objectMapper.constructType(type));
         } catch (Exception e) {
