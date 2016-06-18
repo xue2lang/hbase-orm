@@ -37,7 +37,7 @@ public class TestHBObjectMapper {
     final Put somePut = hbMapper.writeValueAsPut(validObjs.get(0));
 
     @Test
-    public void testHBObjectMapper() {
+    public void testHBObjectMapper() throws DeserializationException {
         for (Citizen obj : validObjs) {
             System.out.printf("Original object: %s%n", obj);
             testResult(obj);
@@ -71,7 +71,7 @@ public class TestHBObjectMapper {
         System.out.printf("Time taken for Result+Row->POJO = %dms%n%n", end - start);
     }
 
-    public void testPut(HBRecord<String> p) {
+    public void testPut(HBRecord<String> p) throws DeserializationException {
         long start, end;
         start = System.currentTimeMillis();
         Put put = hbMapper.writeValueAsPut(Arrays.asList(p, p)).get(0);
@@ -113,7 +113,7 @@ public class TestHBObjectMapper {
     }
 
     @Test
-    public void testInvalidClasses() {
+    public void testInvalidClasses() throws DeserializationException {
         Set<String> exceptionMessages = new HashSet<String>();
         for (Triplet<HBRecord, String, Class<? extends IllegalArgumentException>> p : invalidRecordsAndErrorMessages) {
             HBRecord record = p.getValue0();
@@ -193,7 +193,7 @@ public class TestHBObjectMapper {
 
     @Test
     @SuppressWarnings("ConstantConditions")
-    public void testEmptyResults() {
+    public void testEmptyResults() throws DeserializationException {
         Result nullResult = null, blankResult = new Result(), emptyResult = Result.EMPTY_RESULT;
         Citizen nullCitizen = hbMapper.readValue(nullResult, Citizen.class);
         assertNull("Null Result object should return null", nullCitizen);
@@ -204,7 +204,7 @@ public class TestHBObjectMapper {
 
     @Test
     @SuppressWarnings("ConstantConditions")
-    public void testEmptyPuts() {
+    public void testEmptyPuts() throws DeserializationException {
         Put nullPut = null;
         Citizen nullCitizen = hbMapper.readValue(nullPut, Citizen.class);
         assertNull("Null Put object should return null", nullCitizen);
@@ -265,7 +265,7 @@ public class TestHBObjectMapper {
     }
 
     @Test
-    public void testUninstantiatableClass() {
+    public void testUninstantiatableClass() throws DeserializationException {
         try {
             hbMapper.readValue(someResult, UninstantiatableClass.class);
             fail("If class can't be instantiated, a " + ObjectNotInstantiatableException.class.getName() + " was expected");
@@ -275,7 +275,7 @@ public class TestHBObjectMapper {
     }
 
     @Test
-    public void testHBColumnMultiVersion() {
+    public void testHBColumnMultiVersion() throws DeserializationException {
         Double[] testNumbers = new Double[]{3.14159, 2.71828, 0.0};
         for (Double n : testNumbers) {
             // Written as unversioned, read as versioned
