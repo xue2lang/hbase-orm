@@ -7,7 +7,7 @@ import com.flipkart.hbaseobjectmapper.HBRowKey;
 import java.util.Map;
 import java.util.NavigableMap;
 
-public class ClassesWithFieldIncomptibleWithHBColumnMultiVersion {
+public class ClassesWithFieldIncompatibleWithHBColumnMultiVersion {
     public static class NotMap implements HBRecord<String> {
         @HBRowKey
         protected String key = "key";

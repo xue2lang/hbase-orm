@@ -102,7 +102,8 @@ public class HBObjectMapper {
         return valueToByteArray(rowKey, false);
     }
 
-    <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Class<T> entityClass) throws DeserializationException {
+    @SuppressWarnings("unchecked")
+    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Class<T> entityClass) throws DeserializationException {
         try {
             return (R) byteArrayToValue(rowKeyBytes, entityClass.getDeclaredMethod("composeRowKey").getReturnType(), false);
 
@@ -192,7 +193,7 @@ public class HBObjectMapper {
                 }
                 WrappedHBColumn hbColumn = new WrappedHBColumn(field);
                 if (hbColumn.isSingleVersioned()) {
-                    validateHBColumnField(field);
+                    validateHBColumnSingleVersionField(field);
                     numOfHBColumns++;
                     if (!columns.add(new Pair<String, String>(hbColumn.family(), hbColumn.column()))) {
                         throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumn.family(), hbColumn.column()));
@@ -220,11 +221,8 @@ public class HBObjectMapper {
         }
     }
 
-    /**
-     * Keep this in sync with {@link #getComponentType}
-     */
     private void validateHBColumnMultiVersionField(Field field) {
-        validateHBColumnField(field);
+        validationHBColumnField(field);
         if (!(field.getGenericType() instanceof ParameterizedType)) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " is not even a parameterized type");
         }
@@ -236,16 +234,35 @@ public class HBObjectMapper {
         if (typeArguments.length != 2 || typeArguments[0] != Long.class) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException("Field " + field + " has unexpected type params (Key should be of " + Long.class.getName() + " type)");
         }
+        if (!codec.canDeserialize(getFieldType(field, true))) {
+            throw new UnsupportedFieldTypeException(String.format("Field %s in class %s is of unsupported type Navigable<Long,%s> ", field.getName(), field.getDeclaringClass().getName(), field.getDeclaringClass().getName()));
+        }
     }
 
-    /**
-     * Keep this in sync with {@link #validateHBColumnMultiVersionField(Field)}
-     */
-    Type getComponentType(Field field) {
-        return ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1];
+    Type getFieldType(Field field, boolean isMultiVersioned) {
+        if (isMultiVersioned) {
+            return ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1];
+        } else {
+            return field.getGenericType();
+        }
     }
 
-    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> void validateHBColumnField(Field field) {
+    private void validateHBColumnSingleVersionField(Field field) {
+        validationHBColumnField(field);
+        Type fieldType = getFieldType(field, false);
+        if (fieldType instanceof Class) {
+            Class fieldClazz = (Class) fieldType;
+            if (fieldClazz.isPrimitive()) {
+                String suggestion = nativeCounterParts.containsValue(fieldClazz) ? String.format("- Use type %s instead", nativeCounterParts.inverse().get(fieldClazz).getName()) : "";
+                throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable) %s", field.getName(), field.getDeclaringClass().getName(), fieldClazz.getName(), suggestion));
+            }
+        }
+        if (!codec.canDeserialize(fieldType)) {
+            throw new UnsupportedFieldTypeException(String.format("Field %s in class %s is of unsupported type (%s)", field.getName(), field.getDeclaringClass().getName(), fieldType));
+        }
+    }
+
+    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Class<T> validationHBColumnField(Field field) {
         @SuppressWarnings("unchecked")
         Class<T> clazz = (Class<T>) field.getDeclaringClass();
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
@@ -256,14 +273,7 @@ public class HBObjectMapper {
         if (Modifier.isStatic(modifiers)) {
             throw new MappedColumnCantBeStaticException(field, hbColumn.getName());
         }
-        Class<?> fieldClazz = field.getType();
-        if (fieldClazz.isPrimitive()) {
-            String suggestion = nativeCounterParts.containsValue(fieldClazz) ? String.format("- Use type %s instead", nativeCounterParts.inverse().get(fieldClazz).getName()) : "";
-            throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable) %s", field.getName(), clazz.getName(), fieldClazz.getName(), suggestion));
-        }
-        if (!codec.canDeserialize(field.getGenericType())) {
-            throw new UnsupportedFieldTypeException(String.format("Field %s in class %s is of unsupported type (%s)", field.getName(), clazz.getName(), fieldClazz.getName()));
-        }
+        return clazz;
     }
 
     private <R extends Serializable & Comparable<R>> NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> objToMap(HBRecord<R> obj) {
@@ -677,7 +687,7 @@ public class HBObjectMapper {
      *
      * @param objects List of bean-like objects (of type that extends {@link HBRecord})
      */
-    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> List<Pair<ImmutableBytesWritable, Result>> writeValueAsRowKeyResultPair(List<? extends HBRecord<R>> objects) {
+    public <R extends Serializable & Comparable<R>> List<Pair<ImmutableBytesWritable, Result>> writeValueAsRowKeyResultPair(List<? extends HBRecord<R>> objects) {
         List<Pair<ImmutableBytesWritable, Result>> pairList = new ArrayList<Pair<ImmutableBytesWritable, Result>>(objects.size());
         for (HBRecord<R> obj : objects) {
             pairList.add(writeValueAsRowKeyResultPair(obj));

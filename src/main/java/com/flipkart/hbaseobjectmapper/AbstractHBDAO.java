@@ -20,7 +20,7 @@ import java.util.*;
  * A <i>Data Access Object</i> class that enables simpler random access of HBase rows
  *
  * @param <R> Type of row key
- * @param <T> Entity type that maps to an HBase row (type must implement {@link HBRecord<R>})
+ * @param <T> Entity type that maps to an HBase row (type must implement {@link HBRecord})
  */
 public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T extends HBRecord<R>> {
 
@@ -31,7 +31,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     protected static final HBObjectMapper hbObjectMapper = new HBObjectMapper();
     protected final HTable hTable;
     protected final Class<T> hbRecordClass;
-    protected final Map<String, Field> fields;
+    private final Map<String, Field> fields;
 
     /**
      * Constructs a data access object. Classes extending this class <strong>must</strong> call this constructor using <code>super</code>
@@ -56,7 +56,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      *
      * @param rowKey   Row key
      * @param versions Number of versions to be retrieved
-     * @return HBase row, deserialized as object of your bean-like class (that implements {@link HBRecord<R>})
+     * @return HBase row, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T get(String rowKey, int versions) throws IOException {
@@ -68,7 +68,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * Get a row from HBase table by it's row key
      *
      * @param rowKey Row key
-     * @return HBase row, deserialized as object of your bean-like class (that implements {@link HBRecord<R>})
+     * @return HBase row, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T get(String rowKey) throws IOException {
@@ -81,7 +81,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      *
      * @param rowKeys  Row keys to fetch
      * @param versions Number of versions of columns to fetch
-     * @return Array of HBase rows, deserialized as object of your bean-like class (that implements {@link HBRecord<R>})
+     * @return Array of HBase rows, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T[] get(String[] rowKeys, int versions) throws IOException {
@@ -101,7 +101,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * Get rows from HBase table by array of row keys (This method is a bulk variant of {@link #get(String)} method)
      *
      * @param rowKeys Row keys to fetch
-     * @return Array of HBase rows, deserialized as object of your bean-like class (that implements {@link HBRecord<R>})
+     * @return Array of HBase rows, deserialized as object of your bean-like class (that implements {@link HBRecord})
      * @throws IOException When HBase call fails
      */
     public T[] get(String[] rowKeys) throws IOException {
@@ -172,7 +172,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     }
 
     /**
-     * Persist your bean-like object (of a class that implements {@link HBRecord<R>}) to HBase table
+     * Persist your bean-like object (of a class that implements {@link HBRecord}) to HBase table
      *
      * @param object Object that needs to be persisted
      * @return Row key of the persisted object, represented as a {@link String}
@@ -181,11 +181,11 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public R persist(HBRecord<R> object) throws IOException {
         Put put = hbObjectMapper.writeValueAsPut(object);
         hTable.put(put);
-        return (R) object.composeRowKey();
+        return object.composeRowKey();
     }
 
     /**
-     * Persist a list of your bean-like objects (of a class that implements {@link HBRecord<R>}) to HBase table (this is a bulk variant of {@link #persist(HBRecord<R>)} method)
+     * Persist a list of your bean-like objects (of a class that implements {@link HBRecord}) to HBase table (this is a bulk variant of {@link #persist(HBRecord)} method)
      *
      * @param objects List of objects that needs to be persisted
      * @return Row keys of the persisted objects, represented as a {@link String}
@@ -196,7 +196,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         List<R> rowKeys = new ArrayList<R>(objects.size());
         for (HBRecord<R> object : objects) {
             puts.add(hbObjectMapper.writeValueAsPut(object));
-            rowKeys.add((R) object.composeRowKey());
+            rowKeys.add(object.composeRowKey());
         }
         hTable.put(puts);
         return rowKeys;
@@ -215,13 +215,13 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     }
 
     /**
-     * Delete HBase row by object (of class that implements {@link HBRecord<R>}
+     * Delete HBase row by object (of class that implements {@link HBRecord}
      *
      * @param object Object to delete
      * @throws IOException When HBase call fails
      */
     public void delete(HBRecord<R> object) throws IOException {
-        this.delete((R) object.composeRowKey());
+        this.delete(object.composeRowKey());
     }
 
     /**
@@ -300,7 +300,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         List<Cell> cells = result.getColumnCells(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         for (Cell cell : cells) {
-            Type fieldType = hbColumn.isMultiVersioned() ? hbObjectMapper.getComponentType(field) : field.getType();
+            Type fieldType = hbObjectMapper.getFieldType(field, hbColumn.isMultiVersioned());
             final String rowKey = Bytes.toString(CellUtil.cloneRow(cell));
             if (!map.containsKey(rowKey))
                 map.put(rowKey, new TreeMap<Long, Object>());
@@ -312,7 +312,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * Fetch value of column for a given row key and field
      *
      * @param rowKey    Row key to reference HBase row
-     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord<R>}) whose corresponding column needs to be fetched
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
      * @return Value of the column (boxed), <code>null</code> if row with given rowKey doesn't exist or such field doesn't exist for the row
      * @throws IOException When HBase call fails
      */
@@ -327,7 +327,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * Fetch multiple versions of column values by row key and field name
      *
      * @param rowKey    Row key to reference HBase row
-     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord<R>}) whose corresponding column needs to be fetched
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
      * @param versions  Number of versions of column to fetch
      * @return {@link NavigableMap} of timestamps and values of the column (boxed), <code>null</code> if row with given rowKey doesn't exist or such field doesn't exist for the row
      * @throws IOException When HBase call fails
@@ -341,7 +341,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      *
      * @param startRowKey Start row key (scan start)
      * @param endRowKey   End row key (scan end)
-     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord<R>}) whose corresponding column needs to be fetched
+     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
      * @return Map of row key and column value
      * @throws IOException When HBase call fails
      */
@@ -363,7 +363,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      *
      * @param startRowKey Start row key (scan start)
      * @param endRowKey   End row key (scan end)
-     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord<R>}) whose corresponding column needs to be fetched
+     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
      * @param versions    Number of versions of column to fetch
      * @return Map of row key and column values (versioned)
      * @throws IOException When HBase call fails
@@ -386,7 +386,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * Fetch column values for a given array of row keys (bulk variant of method {@link #fetchFieldValue(String, String)})
      *
      * @param rowKeys   Array of row keys to fetch
-     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord<R>}) whose corresponding column needs to be fetched
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
      * @return Map of row key and column values
      * @throws IOException
      */
@@ -399,7 +399,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * Fetch specified number of versions of values of an HBase column for an array of row keys
      *
      * @param rowKeys   Array of row keys to fetch
-     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord<R>}) whose corresponding column needs to be fetched
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
      * @param versions  Number of versions of column to fetch
      * @return Map of row key and column values (versioned)
      * @throws IOException When HBase call fails
