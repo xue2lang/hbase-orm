@@ -285,7 +285,9 @@ public class TestHBObjectMapper {
             assertEquals("Column history size mismatch", 1, columnHistory.size());
             assertEquals(String.format("Inconsistency between %s and %s", HBColumn.class.getSimpleName(), HBColumnMultiVersion.class.getSimpleName()), n, columnHistory.lastEntry().getValue());
             // Written as versioned, read as unversioned
-            Result result1 = hbMapper.writeValueAsResult(new Crawl("key").addF1(Double.MAX_VALUE).addF1(Double.MAX_VALUE).addF1(Double.MAX_VALUE).addF1(n));
+            Crawl key = new Crawl("key").addF1(Double.MAX_VALUE).addF1(Double.MAX_VALUE).addF1(Double.MAX_VALUE);
+            Crawl crawl = key.addF1(n);
+            Result result1 = hbMapper.writeValueAsResult(crawl);
             CrawlNoVersion unversioned = hbMapper.readValue(result1, CrawlNoVersion.class);
             Double f1 = unversioned.getF1();
             assertEquals(String.format("Inconsistency between %s and %s", HBColumnMultiVersion.class.getSimpleName(), HBColumn.class.getSimpleName()), n, f1);
