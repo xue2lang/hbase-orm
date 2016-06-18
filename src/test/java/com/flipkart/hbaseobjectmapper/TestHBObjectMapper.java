@@ -1,5 +1,6 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.codec.DeserializationException;
 import com.flipkart.hbaseobjectmapper.entities.*;
 import com.flipkart.hbaseobjectmapper.exceptions.*;
 import org.apache.hadoop.hbase.client.Put;
@@ -46,7 +47,7 @@ public class TestHBObjectMapper {
         }
     }
 
-    public void testResult(HBRecord p) {
+    public void testResult(HBRecord<String> p) throws DeserializationException {
         long start, end;
         start = System.currentTimeMillis();
         Result result = hbMapper.writeValueAsResult(p);
@@ -59,7 +60,7 @@ public class TestHBObjectMapper {
         System.out.printf("Time taken for Result->POJO = %dms%n%n", end - start);
     }
 
-    public void testResultWithRow(HBRecord p) {
+    public void testResultWithRow(HBRecord<String> p) throws DeserializationException {
         long start, end;
         Result result = hbMapper.writeValueAsResult(Arrays.asList(p, p)).get(0);
         ImmutableBytesWritable rowKey = Util.strToIbw(p.composeRowKey());
@@ -70,7 +71,7 @@ public class TestHBObjectMapper {
         System.out.printf("Time taken for Result+Row->POJO = %dms%n%n", end - start);
     }
 
-    public void testPut(HBRecord p) {
+    public void testPut(HBRecord<String> p) {
         long start, end;
         start = System.currentTimeMillis();
         Put put = hbMapper.writeValueAsPut(Arrays.asList(p, p)).get(0);
@@ -83,7 +84,7 @@ public class TestHBObjectMapper {
         System.out.printf("Time taken for Put->POJO = %dms%n%n", end - start);
     }
 
-    public void testPutWithRow(HBRecord p) {
+    public void testPutWithRow(HBRecord<String> p) throws DeserializationException {
         long start, end;
         Put put = hbMapper.writeValueAsPut(p);
         ImmutableBytesWritable rowKey = Util.strToIbw(p.composeRowKey());
@@ -95,7 +96,7 @@ public class TestHBObjectMapper {
     }
 
     @Test
-    public void testInvalidRowKey() {
+    public void testInvalidRowKey() throws DeserializationException {
         Citizen e = TestObjects.validObjects.get(0);
         try {
             hbMapper.readValue("invalid row key", hbMapper.writeValueAsPut(e), Citizen.class);
@@ -211,7 +212,7 @@ public class TestHBObjectMapper {
 
     @Test
     public void testGetRowKey() {
-        ImmutableBytesWritable rowKey = hbMapper.getRowKey(new HBRecord() {
+        ImmutableBytesWritable rowKey = hbMapper.getRowKey(new HBRecord<String>() {
             @Override
             public String composeRowKey() {
                 return "rowkey";
@@ -224,7 +225,7 @@ public class TestHBObjectMapper {
         });
         assertEquals("Row keys don't match", rowKey, Util.strToIbw("rowkey"));
         try {
-            hbMapper.getRowKey(new HBRecord() {
+            hbMapper.getRowKey(new HBRecord<String>() {
                 @Override
                 public String composeRowKey() {
                     return null;
@@ -240,7 +241,7 @@ public class TestHBObjectMapper {
 
         }
         try {
-            hbMapper.getRowKey(new HBRecord() {
+            hbMapper.getRowKey(new HBRecord<String>() {
                 @Override
                 public String composeRowKey() {
                     throw new RuntimeException("Some blah");
