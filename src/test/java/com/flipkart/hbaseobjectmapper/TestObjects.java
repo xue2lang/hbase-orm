@@ -2,6 +2,7 @@ package com.flipkart.hbaseobjectmapper;
 
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
 import com.flipkart.hbaseobjectmapper.entities.Dependents;
+import com.flipkart.hbaseobjectmapper.entities.Employee;
 import com.flipkart.hbaseobjectmapper.exceptions.AllHBColumnFieldsNullException;
 import com.flipkart.hbaseobjectmapper.exceptions.FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty;
 import com.flipkart.hbaseobjectmapper.exceptions.HBRowKeyFieldCantBeNullException;
@@ -14,7 +15,7 @@ import static com.flipkart.hbaseobjectmapper.TestUtil.triplet;
 
 
 public class TestObjects {
-    public static final List<Citizen> validObjectsNoVersion = Arrays.asList(
+    public static final List<Citizen> validCitizenObjectsNoVersion = Arrays.asList(
             new Citizen("IND", 101, "Manu", (short) 30, 30000, false, 2.3f, 4.33, 34L, new BigDecimal(100), 560034, new TreeMap<Long, Integer>() {
                 {
                     put(System.currentTimeMillis(), 100001);
@@ -31,6 +32,16 @@ public class TestObjects {
             new Citizen("IND", 105, "Nilesh", null, null, null, null, null, null, null, null, null, null, new Dependents(null, Arrays.asList(141, 142)))
     );
 
+    public static final List<HBRecord> validOtherObjectsNoVersion = asList(
+            new Employee(1L, "Raja")
+    );
+
+    private static List<HBRecord> asList(HBRecord... hbRecords) {
+        List<HBRecord> output = new ArrayList<HBRecord>();
+        Collections.addAll(output, hbRecords);
+        return output;
+    }
+
     public static final List<Citizen> validObjectsWithHBColumnMultiVersion = Arrays.asList(
             new Citizen("IND", 106, "Ram", null, 30000, true, null, null, null, null, null, new TreeMap<Long, Integer>() {
                 {
@@ -46,9 +57,10 @@ public class TestObjects {
             }, null, null)
     );
 
-    public static final List<Citizen> validObjects = new ArrayList<Citizen>() {
+    public static final List<HBRecord> validObjects = new ArrayList<HBRecord>() {
         {
-            addAll(TestObjects.validObjectsNoVersion);
+            addAll(TestObjects.validCitizenObjectsNoVersion);
+            addAll(TestObjects.validOtherObjectsNoVersion);
             addAll(TestObjects.validObjectsWithHBColumnMultiVersion);
         }
     };

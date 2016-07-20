@@ -1,6 +1,5 @@
 package com.flipkart.hbaseobjectmapper.mr;
 
-import com.flipkart.hbaseobjectmapper.Util;
 import com.flipkart.hbaseobjectmapper.entities.CitizenSummary;
 import com.flipkart.hbaseobjectmapper.mr.lib.AbstractMRTest;
 import com.flipkart.hbaseobjectmapper.mr.lib.TableReduceDriver;
@@ -29,7 +28,7 @@ public class TestReducer extends AbstractMRTest {
 
     @Test
     public void test() throws Exception {
-        Pair<ImmutableBytesWritable, Mutation> reducerResult = reducerDriver.withInput(Util.strToIbw("key"), Arrays.asList(new IntWritable(1), new IntWritable(5))).run().get(0);
+        Pair<ImmutableBytesWritable, Mutation> reducerResult = reducerDriver.withInput(hbObjectMapper.rowKeyToIbw("key"), Arrays.asList(new IntWritable(1), new IntWritable(5))).run().get(0);
         CitizenSummary citizenSummary = hbObjectMapper.readValue(reducerResult.getFirst(), (Put) reducerResult.getSecond(), CitizenSummary.class);
         assertEquals(citizenSummary.getAverageAge(), (Float) 3.0f);
     }

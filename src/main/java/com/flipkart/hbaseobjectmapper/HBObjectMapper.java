@@ -85,8 +85,20 @@ public class HBObjectMapper {
 
     /**
      * Instantiate object of this class with a custom {@link Codec}
+     * <p>
+     * <b>Note</b>: For following java types, HBase's native serializers/deserializers are used, irrespective of what codec you specify: <ul>
+     * <li>{@link Boolean}</li>
+     * <li>{@link Short}</li>
+     * <li>{@link Integer}</li>
+     * <li>{@link Long}</li>
+     * <li>{@link Float}</li>
+     * <li>{@link Double}</li>
+     * <li>{@link String}</li>
+     * <li>{@link BigDecimal}</li>
+     * </ul>
+     * </p>
      *
-     * @param codec Codec to be used for serialization and deserialization of columns
+     * @param codec Codec to be used for serialization and deserialization of fields
      */
     public HBObjectMapper(Codec codec) {
         this.codec = codec;
@@ -158,7 +170,14 @@ public class HBObjectMapper {
         }
     }
 
-    private byte[] valueToByteArray(Serializable value, boolean serializeAsString) {
+    /**
+     * Convert a {@link Serializable} object into a <code>byte[]</code>
+     *
+     * @param value             Object to be serialized
+     * @param serializeAsString If this is set to <code>true</code>, a value like <code>1.025</code>
+     * @return
+     */
+    public byte[] valueToByteArray(Serializable value, boolean serializeAsString) {
         try {
             if (value == null)
                 return null;
@@ -180,6 +199,20 @@ public class HBObjectMapper {
         } catch (IllegalArgumentException iax) {
             throw new BadHBaseLibStateException(iax);
         }
+    }
+
+    public byte[] valueToByteArray(Serializable value) {
+        return valueToByteArray(value, false);
+    }
+
+    /**
+     * Converts a {@link Serializable} object into {@link ImmutableBytesWritable}. Useful in test cases for mapper and reducers.
+     *
+     * @param value Object to be serialized
+     * @return Byte array, wrapped in HBase's data type
+     */
+    public ImmutableBytesWritable rowKeyToIbw(Serializable value) {
+        return new ImmutableBytesWritable(valueToByteArray(value));
     }
 
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> void validateHBClass(Class<T> clazz) {
@@ -269,9 +302,8 @@ public class HBObjectMapper {
         }
     }
 
-    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Class<T> validationHBColumnField(Field field) {
+    private void validationHBColumnField(Field field) {
         @SuppressWarnings("unchecked")
-        Class<T> clazz = (Class<T>) field.getDeclaringClass();
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         int modifiers = field.getModifiers();
         if (Modifier.isTransient(modifiers)) {
@@ -280,7 +312,6 @@ public class HBObjectMapper {
         if (Modifier.isStatic(modifiers)) {
             throw new MappedColumnCantBeStaticException(field, hbColumn.getName());
         }
-        return clazz;
     }
 
     private <R extends Serializable & Comparable<R>> NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> objToMap(HBRecord<R> obj) {
@@ -398,7 +429,7 @@ public class HBObjectMapper {
      * @param objects List of bean-like objects (of type that extends {@link HBRecord})
      * @return List of HBase's {@link Put} objects
      */
-    public <R extends Serializable & Comparable<R>> List<Put> writeValueAsPut(List<? extends HBRecord<R>> objects) {
+    public <R extends Serializable & Comparable<R>> List<Put> writeValueAsPut(List<HBRecord<R>> objects) {
         List<Put> puts = new ArrayList<Put>(objects.size());
         for (HBRecord<R> obj : objects) {
             Put put = writeValueAsPut(obj);
@@ -439,7 +470,7 @@ public class HBObjectMapper {
      * @param objects List of bean-like objects (of type that extends {@link HBRecord})
      * @return List of HBase's {@link Result} objects
      */
-    public <R extends Serializable & Comparable<R>> List<Result> writeValueAsResult(List<? extends HBRecord<R>> objects) {
+    public <R extends Serializable & Comparable<R>> List<Result> writeValueAsResult(List<HBRecord<R>> objects) {
         List<Result> results = new ArrayList<Result>(objects.size());
         for (HBRecord<R> obj : objects) {
             Result result = writeValueAsResult(obj);

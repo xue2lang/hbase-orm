@@ -9,6 +9,7 @@ import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.javatuples.Triplet;
 import org.junit.Test;
 
+import java.io.Serializable;
 import java.util.*;
 
 import static com.flipkart.hbaseobjectmapper.TestUtil.triplet;
@@ -31,14 +32,14 @@ public class TestHBObjectMapper {
     );
 
     final HBObjectMapper hbMapper = new HBObjectMapper();
-    final List<Citizen> validObjs = TestObjects.validObjects;
+    final List<HBRecord> validObjs = TestObjects.validObjects;
 
     final Result someResult = hbMapper.writeValueAsResult(validObjs.get(0));
     final Put somePut = hbMapper.writeValueAsPut(validObjs.get(0));
 
     @Test
     public void testHBObjectMapper() throws DeserializationException {
-        for (Citizen obj : validObjs) {
+        for (HBRecord obj : validObjs) {
             System.out.printf("Original object: %s%n", obj);
             testResult(obj);
             testResultWithRow(obj);
@@ -47,49 +48,56 @@ public class TestHBObjectMapper {
         }
     }
 
-    public void testResult(HBRecord<String> p) throws DeserializationException {
+    public void testResult(HBRecord p) throws DeserializationException {
         long start, end;
         start = System.currentTimeMillis();
         Result result = hbMapper.writeValueAsResult(p);
         end = System.currentTimeMillis();
         System.out.printf("Time taken for POJO->Result = %dms%n", end - start);
         start = System.currentTimeMillis();
-        Citizen pFromResult = hbMapper.readValue(result, Citizen.class);
+        HBRecord pFromResult = hbMapper.readValue(result, p.getClass());
         end = System.currentTimeMillis();
         assertEquals("Data mismatch after deserialization from Result", p, pFromResult);
         System.out.printf("Time taken for Result->POJO = %dms%n%n", end - start);
     }
 
-    public void testResultWithRow(HBRecord<String> p) throws DeserializationException {
+    public void testResultWithRow(HBRecord p) throws DeserializationException {
         long start, end;
-        Result result = hbMapper.writeValueAsResult(Arrays.asList(p, p)).get(0);
-        ImmutableBytesWritable rowKey = Util.strToIbw(p.composeRowKey());
+        Result result = (Result) hbMapper.writeValueAsResult(l(p, p)).get(0);
+        ImmutableBytesWritable rowKey = hbMapper.rowKeyToIbw(p.composeRowKey());
         start = System.currentTimeMillis();
-        Citizen pFromResult = hbMapper.readValue(rowKey, result, Citizen.class);
+        HBRecord pFromResult = hbMapper.readValue(rowKey, result, p.getClass());
         end = System.currentTimeMillis();
         assertEquals("Data mismatch after deserialization from Result+Row", p, pFromResult);
         System.out.printf("Time taken for Result+Row->POJO = %dms%n%n", end - start);
     }
 
-    public void testPut(HBRecord<String> p) throws DeserializationException {
+    private <R extends Serializable & Comparable<R>> List<HBRecord<R>> l(HBRecord<R>... records) {
+        ArrayList<HBRecord<R>> list = new ArrayList<HBRecord<R>>();
+        Collections.addAll(list, records);
+        return list;
+
+    }
+
+    public void testPut(HBRecord p) throws DeserializationException {
         long start, end;
         start = System.currentTimeMillis();
-        Put put = hbMapper.writeValueAsPut(Arrays.asList(p, p)).get(0);
+        Put put = (Put) hbMapper.writeValueAsPut(l(p, p)).get(0);
         end = System.currentTimeMillis();
         System.out.printf("Time taken for POJO->Put = %dms%n", end - start);
         start = System.currentTimeMillis();
-        Citizen pFromPut = hbMapper.readValue(put, Citizen.class);
+        HBRecord pFromPut = hbMapper.readValue(put, p.getClass());
         end = System.currentTimeMillis();
         assertEquals("Data mismatch after deserialization from Put", p, pFromPut);
         System.out.printf("Time taken for Put->POJO = %dms%n%n", end - start);
     }
 
-    public void testPutWithRow(HBRecord<String> p) throws DeserializationException {
+    public void testPutWithRow(HBRecord p) throws DeserializationException {
         long start, end;
         Put put = hbMapper.writeValueAsPut(p);
-        ImmutableBytesWritable rowKey = Util.strToIbw(p.composeRowKey());
+        ImmutableBytesWritable rowKey = hbMapper.rowKeyToIbw(p.composeRowKey());
         start = System.currentTimeMillis();
-        Citizen pFromPut = hbMapper.readValue(rowKey, put, Citizen.class);
+        HBRecord pFromPut = hbMapper.readValue(rowKey, put, p.getClass());
         end = System.currentTimeMillis();
         assertEquals("Data mismatch after deserialization from Put", p, pFromPut);
         System.out.printf("Time taken for Put->POJO = %dms%n%n", end - start);
@@ -97,7 +105,7 @@ public class TestHBObjectMapper {
 
     @Test
     public void testInvalidRowKey() throws DeserializationException {
-        Citizen e = TestObjects.validObjects.get(0);
+        Citizen e = (Citizen) TestObjects.validObjects.get(0);
         try {
             hbMapper.readValue("invalid row key", hbMapper.writeValueAsPut(e), Citizen.class);
             fail("Invalid row key should've thrown " + RowKeyCouldNotBeParsedException.class.getName());
@@ -223,7 +231,7 @@ public class TestHBObjectMapper {
 
             }
         });
-        assertEquals("Row keys don't match", rowKey, Util.strToIbw("rowkey"));
+        assertEquals("Row keys don't match", rowKey, hbMapper.rowKeyToIbw("rowkey"));
         try {
             hbMapper.getRowKey(new HBRecord<String>() {
                 @Override
@@ -257,7 +265,8 @@ public class TestHBObjectMapper {
 
         }
         try {
-            hbMapper.getRowKey(null);
+            HBRecord<Integer> nullRecord = null;
+            hbMapper.getRowKey(nullRecord);
             fail("If object is null, a " + NullPointerException.class.getName() + " was expected");
         } catch (NullPointerException ignored) {
 

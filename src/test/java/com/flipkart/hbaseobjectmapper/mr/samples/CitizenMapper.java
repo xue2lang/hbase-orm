@@ -9,8 +9,6 @@ import org.apache.hadoop.io.IntWritable;
 
 import java.io.IOException;
 
-import static com.flipkart.hbaseobjectmapper.Util.strToIbw;
-
 public class CitizenMapper extends TableMapper<ImmutableBytesWritable, IntWritable> {
     private final HBObjectMapper hbObjectMapper = new HBObjectMapper();
 
@@ -19,6 +17,6 @@ public class CitizenMapper extends TableMapper<ImmutableBytesWritable, IntWritab
         Citizen e = hbObjectMapper.readValue(key, value, Citizen.class);
         if (e.getAge() == null)
             return;
-        context.write(strToIbw("key"), new IntWritable(e.getAge().intValue()));
+        context.write(hbObjectMapper.rowKeyToIbw("key"), new IntWritable(e.getAge().intValue()));
     }
 }

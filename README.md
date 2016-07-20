@@ -13,7 +13,7 @@ This library enables to you represent your HBase row as a class like below:
 
 ```java
 @HBTable("citizens")
-public class Citizen implements HBRecord {
+public class Citizen implements HBRecord<String> {
     @HBRowKey
     private String countryCode;
     @HBRowKey

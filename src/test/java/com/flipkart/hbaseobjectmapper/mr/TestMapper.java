@@ -2,13 +2,13 @@ package com.flipkart.hbaseobjectmapper.mr;
 
 import com.flipkart.hbaseobjectmapper.TestObjects;
 import com.flipkart.hbaseobjectmapper.TestUtil;
-import com.flipkart.hbaseobjectmapper.Util;
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
 import com.flipkart.hbaseobjectmapper.mr.lib.AbstractMRTest;
 import com.flipkart.hbaseobjectmapper.mr.lib.TableMapDriver;
 import com.flipkart.hbaseobjectmapper.mr.samples.CitizenMapper;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.mrunit.types.Pair;
 import org.junit.Before;
@@ -31,7 +31,7 @@ public class TestMapper extends AbstractMRTest {
 
     @Test
     public void testSingle() throws IOException {
-        Citizen citizen = TestObjects.validObjects.get(0);
+        Citizen citizen = (Citizen) TestObjects.validObjects.get(0);
         org.apache.hadoop.hbase.util.Pair<ImmutableBytesWritable, Result> rowKeyResultPair = hbObjectMapper.writeValueAsRowKeyResultPair(citizen);
         mapDriver
                 .withInput(
@@ -39,7 +39,7 @@ public class TestMapper extends AbstractMRTest {
                         rowKeyResultPair.getSecond() // this line can alternatively be hbObjectMapper.writeValueAsResult(citizen)
 
                 )
-                .withOutput(Util.strToIbw("key"), new IntWritable(citizen.getAge()))
+                .withOutput(hbObjectMapper.rowKeyToIbw("key"), new IntWritable(citizen.getAge()))
                 .runTest();
     }
 
@@ -49,7 +49,7 @@ public class TestMapper extends AbstractMRTest {
         List<Pair<ImmutableBytesWritable, Result>> citizens = TestUtil.writeValueAsRowKeyResultPair(TestObjects.validObjects);
         List<Pair<ImmutableBytesWritable, IntWritable>> mapResults = mapDriver.withAll(citizens).run();
         for (Pair<ImmutableBytesWritable, IntWritable> mapResult : mapResults) {
-            assertEquals(Util.ibwToStr(mapResult.getFirst()), "key");
+            assertEquals(Bytes.toString(mapResult.getFirst().get()), "IND#1");
         }
     }
 }
