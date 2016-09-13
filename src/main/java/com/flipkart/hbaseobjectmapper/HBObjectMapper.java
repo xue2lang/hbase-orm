@@ -25,8 +25,8 @@ import java.util.*;
 
 /**
  * <p>An object mapper class that helps convert your bean-like objects to HBase's {@link Put} and {@link Result} objects (and vice-versa).</p>
- * <p>For use in MapReduce jobs involving HBase tables and their unit-tests</p>
- * <p>This class is thread-safe</p>
+ * <p>This class is for use in MapReduce jobs which read from and/or write to HBase tables and their unit-tests.</p>
+ * <p>This class is thread-safe.</p>
  */
 public class HBObjectMapper {
 

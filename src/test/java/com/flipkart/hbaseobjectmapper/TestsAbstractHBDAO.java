@@ -1,18 +1,16 @@
 package com.flipkart.hbaseobjectmapper;
 
-import com.flipkart.hbaseobjectmapper.daos.CitizenDAO;
-import com.flipkart.hbaseobjectmapper.daos.CitizenSummaryDAO;
-import com.flipkart.hbaseobjectmapper.daos.CrawlDAO;
-import com.flipkart.hbaseobjectmapper.daos.CrawlNoVersionDAO;
+import com.flipkart.hbaseobjectmapper.daos.*;
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
 import com.flipkart.hbaseobjectmapper.entities.Crawl;
 import com.flipkart.hbaseobjectmapper.entities.CrawlNoVersion;
+import com.flipkart.hbaseobjectmapper.entities.Employee;
 import com.flipkart.hbaseobjectmapper.util.cluster.HBaseCluster;
 import com.flipkart.hbaseobjectmapper.util.cluster.InMemoryHBaseCluster;
 import com.flipkart.hbaseobjectmapper.util.cluster.RealHBaseCluster;
 import org.apache.hadoop.conf.Configuration;
-import org.junit.After;
-import org.junit.Before;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -23,56 +21,34 @@ import static com.flipkart.hbaseobjectmapper.util.TestUtil.*;
 import static org.junit.Assert.*;
 
 public class TestsAbstractHBDAO {
-    private Configuration configuration;
-    private CitizenDAO citizenDao;
-    private CitizenSummaryDAO citizenSummaryDAO;
-    private CrawlDAO crawlDAO;
-    private CrawlNoVersionDAO crawlNoVersionDAO;
-    private HBaseCluster hBaseCluster;
+    private static Configuration configuration;
+    private static HBaseCluster hBaseCluster;
 
-    @Before
-    public void setup() {
-        hBaseCluster = getHBaseCluster();
+    @BeforeClass
+    public static void setup() {
         try {
+            String useRegularHBaseClient = System.getenv("USE_REGULAR_HBASE_CLIENT");
+            if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true")))
+                hBaseCluster = new RealHBaseCluster();
+            else
+                hBaseCluster = new InMemoryHBaseCluster();
             configuration = hBaseCluster.init();
         } catch (Exception e) {
             e.printStackTrace();
             fail("Failed to connect to HBase. Aborted execution of DAO-related test cases");
         }
-        try {
-            createDAOs();
-        } catch (Exception e) {
-            e.printStackTrace();
-            fail("Could not setup HBase for testing");
-        }
     }
 
-    private HBaseCluster getHBaseCluster() {
-        String useRegularHBaseClient = System.getenv("USE_REGULAR_HBASE_CLIENT");
-        if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true")))
-            return new RealHBaseCluster();
-        else
-            return new InMemoryHBaseCluster();
-    }
-
-    private void createDAOs() throws IOException {
+    @Test
+    public void testRegularCRUD() throws IOException {
         hBaseCluster.createTable("citizens", a("main", "optional"), 1);
-        citizenDao = new CitizenDAO(configuration);
+        CitizenDAO citizenDao = new CitizenDAO(configuration);
         hBaseCluster.createTable("citizens_summary", a("a"), 1);
-        citizenSummaryDAO = new CitizenSummaryDAO(configuration);
-        hBaseCluster.createTable("crawls", a("a"), 3);
-        crawlDAO = new CrawlDAO(configuration);
-        crawlNoVersionDAO = new CrawlNoVersionDAO(configuration);
-    }
-
-    public void testTableParticulars() {
+        CitizenSummaryDAO citizenSummaryDAO = new CitizenSummaryDAO(configuration);
         assertEquals(citizenDao.getTableName(), "citizens");
         assertTrue("Issue with column families of 'citizens' table\n" + citizenDao.getColumnFamilies(), setEquals(citizenDao.getColumnFamilies(), s("main", "optional")));
         assertEquals(citizenSummaryDAO.getTableName(), "citizens_summary");
         assertTrue("Issue with column families of 'citizens_summary' table\n" + citizenSummaryDAO.getColumnFamilies(), setEquals(citizenSummaryDAO.getColumnFamilies(), s("a")));
-    }
-
-    public void testHBaseDAO() throws IOException {
         final List<Citizen> testObjs = TestObjects.validCitizenObjectsNoVersion;
         String[] rowKeys = new String[testObjs.size()];
         Map<String, Map<String, Object>> expectedFieldValues = new HashMap<String, Map<String, Object>>();
@@ -153,7 +129,11 @@ public class TestsAbstractHBDAO {
         assertNull("Record was not deleted: " + citizensToBeDeleted.get(1), citizenDao.get(citizensToBeDeleted.get(1).composeRowKey()));
     }
 
-    public void testHBaseMultiVersionDAO() throws Exception {
+    @Test
+    public void testMultiVersionCRUD() throws Exception {
+        hBaseCluster.createTable("crawls", a("a"), 3);
+        CrawlDAO crawlDAO = new CrawlDAO(configuration);
+        CrawlNoVersionDAO crawlNoVersionDAO = new CrawlNoVersionDAO(configuration);
         final int NUM_VERSIONS = 3;
         Double[] testNumbers = new Double[]{-1.0, Double.MAX_VALUE, Double.MIN_VALUE, 3.14159, 2.71828, 1.0};
         Double[] testNumbersOfRange = Arrays.copyOfRange(testNumbers, testNumbers.length - NUM_VERSIONS, testNumbers.length);
@@ -201,17 +181,17 @@ public class TestsAbstractHBDAO {
                 latestValuesRangeScan.add((Double) e.getValue().lastEntry().getValue());
                 oldestValuesRangeScan.add((Double) e.getValue().firstEntry().getValue());
             }
-            assertTrue("When fetching multiple versions of a field, the latest version of field is not as expected", latestValuesRangeScan.size() == 1);
+            assertEquals("When fetching multiple versions of a field, the latest version of field is not as expected", 1, latestValuesRangeScan.size());
             Set<Double> latestValuesBulkScan = new HashSet<Double>();
             Map<String, NavigableMap<Long, Object>> fieldValues2 = crawlDAO.fetchFieldValues(rowKeys, "f1", k);
             for (NavigableMap.Entry<String, NavigableMap<Long, Object>> e : fieldValues2.entrySet()) {
                 latestValuesBulkScan.add((Double) e.getValue().lastEntry().getValue());
                 oldestValuesBulkScan.add((Double) e.getValue().firstEntry().getValue());
             }
-            assertTrue("When fetching multiple versions of a field, the latest version of field is not as expected", latestValuesBulkScan.size() == 1);
+            assertEquals("When fetching multiple versions of a field, the latest version of field is not as expected", 1, latestValuesBulkScan.size());
         }
-        assertTrue("When fetching multiple versions of a field through bulk scan, the oldest version of field is not as expected", oldestValuesRangeScan.size() == NUM_VERSIONS);
-        assertTrue("When fetching multiple versions of a field through range scan, the oldest version of field is not as expected", oldestValuesBulkScan.size() == NUM_VERSIONS);
+        assertEquals("When fetching multiple versions of a field through bulk scan, the oldest version of field is not as expected", NUM_VERSIONS, oldestValuesRangeScan.size());
+        assertEquals("When fetching multiple versions of a field through range scan, the oldest version of field is not as expected", NUM_VERSIONS, oldestValuesBulkScan.size());
         assertEquals("Fetch by array and fetch by range differ", oldestValuesRangeScan, oldestValuesBulkScan);
 
         // Deletion tests:
@@ -242,19 +222,18 @@ public class TestsAbstractHBDAO {
 
     }
 
-
     @Test
-    public void test() throws Exception {
-        System.out.println("Testing table attributes");
-        testTableParticulars();
-        System.out.println("Testing data access objects");
-        testHBaseDAO();
-        System.out.println("Testing multi-versioned data access objects");
-        testHBaseMultiVersionDAO();
+    public void testNonStringRowkeys() throws IOException {
+        hBaseCluster.createTable("employees", a("a"), 1);
+        EmployeeDAO employeeDAO = new EmployeeDAO(configuration);
+        Employee ePre = new Employee(100L, "E1", (short) 3);
+        Long rowKey = employeeDAO.persist(ePre);
+        Employee ePost = employeeDAO.get(rowKey);
+        assertEquals("Object got corrupted ", ePre, ePost);
     }
 
-    @After
-    public void tearDown() throws Exception {
+    @AfterClass
+    public static void tearDown() throws Exception {
         hBaseCluster.end();
     }
 }

@@ -17,10 +17,12 @@ import java.lang.reflect.Type;
 import java.util.*;
 
 /**
- * A <i>Data Access Object</i> class that enables simpler random access of HBase rows
+ * A <i>Data Access Object</i> class that enables simple random access (read/write) of HBase rows.
+ * <p>
+ * <p>Please note: This class is not thread-safe</p>
  *
- * @param <R> Type of row key
- * @param <T> Entity type that maps to an HBase row (type must implement {@link HBRecord})
+ * @param <R> Data type of row key
+ * @param <T> Entity type that maps to an HBase row (must implement {@link HBRecord} interface)
  */
 public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T extends HBRecord<R>> {
 
