@@ -13,11 +13,11 @@ public class MRTestUtil {
     private static final HBObjectMapper hbObjectMapper = new HBObjectMapper();
 
     public static Pair<ImmutableBytesWritable, Result> writeValueAsRowKeyResultPair(HBRecord obj) {
-        return new Pair<ImmutableBytesWritable, Result>(hbObjectMapper.getRowKey(obj), hbObjectMapper.writeValueAsResult(obj));
+        return new Pair<>(hbObjectMapper.getRowKey(obj), hbObjectMapper.writeValueAsResult(obj));
     }
 
     public static List<Pair<ImmutableBytesWritable, Result>> writeValueAsRowKeyResultPair(List<? extends HBRecord> objs) {
-        List<Pair<ImmutableBytesWritable, Result>> pairList = new ArrayList<Pair<ImmutableBytesWritable, Result>>(objs.size());
+        List<Pair<ImmutableBytesWritable, Result>> pairList = new ArrayList<>(objs.size());
         for (HBRecord obj : objs) {
             pairList.add(writeValueAsRowKeyResultPair(obj));
         }

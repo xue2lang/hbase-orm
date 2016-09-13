@@ -51,7 +51,7 @@ public class TestsAbstractHBDAO {
         assertTrue("Issue with column families of 'citizens_summary' table\n" + citizenSummaryDAO.getColumnFamilies(), setEquals(citizenSummaryDAO.getColumnFamilies(), s("a")));
         final List<Citizen> testObjs = TestObjects.validCitizenObjectsNoVersion;
         String[] rowKeys = new String[testObjs.size()];
-        Map<String, Map<String, Object>> expectedFieldValues = new HashMap<String, Map<String, Object>>();
+        Map<String, Map<String, Object>> expectedFieldValues = new HashMap<>();
         for (int i = 0; i < testObjs.size(); i++) {
             HBRecord<String> e = testObjs.get(i);
             try {
@@ -138,7 +138,7 @@ public class TestsAbstractHBDAO {
         Double[] testNumbers = new Double[]{-1.0, Double.MAX_VALUE, Double.MIN_VALUE, 3.14159, 2.71828, 1.0};
         Double[] testNumbersOfRange = Arrays.copyOfRange(testNumbers, testNumbers.length - NUM_VERSIONS, testNumbers.length);
         // Written as unversioned, read as versioned
-        List<CrawlNoVersion> objs = new ArrayList<CrawlNoVersion>();
+        List<CrawlNoVersion> objs = new ArrayList<>();
         for (Double n : testNumbers) {
             objs.add(new CrawlNoVersion("key").setF1(n));
         }
@@ -163,7 +163,7 @@ public class TestsAbstractHBDAO {
         assertEquals("Entry with the highest version (i.e. timestamp) isn't the one that was returned by DAO get", crawlNoVersion.getF1(), testNumbers[testNumbers.length - 1]);
         assertArrayEquals("Issue with version history implementation when written as versioned and read as unversioned", testNumbersOfRange, crawlDAO.get("key2", NUM_VERSIONS).getF1().values().toArray());
 
-        List<String> rowKeysList = new ArrayList<String>();
+        List<String> rowKeysList = new ArrayList<>();
         for (int v = 0; v <= 9; v++) {
             for (int k = 1; k <= 4; k++) {
                 String key = "oKey" + k;
@@ -173,16 +173,16 @@ public class TestsAbstractHBDAO {
         }
         String[] rowKeys = rowKeysList.toArray(new String[rowKeysList.size()]);
 
-        Set<Double> oldestValuesRangeScan = new HashSet<Double>(), oldestValuesBulkScan = new HashSet<Double>();
+        Set<Double> oldestValuesRangeScan = new HashSet<>(), oldestValuesBulkScan = new HashSet<>();
         for (int k = 1; k <= NUM_VERSIONS; k++) {
-            Set<Double> latestValuesRangeScan = new HashSet<Double>();
+            Set<Double> latestValuesRangeScan = new HashSet<>();
             NavigableMap<String, NavigableMap<Long, Object>> fieldValues1 = crawlDAO.fetchFieldValues("oKey0", "oKey9", "f1", k);
             for (NavigableMap.Entry<String, NavigableMap<Long, Object>> e : fieldValues1.entrySet()) {
                 latestValuesRangeScan.add((Double) e.getValue().lastEntry().getValue());
                 oldestValuesRangeScan.add((Double) e.getValue().firstEntry().getValue());
             }
             assertEquals("When fetching multiple versions of a field, the latest version of field is not as expected", 1, latestValuesRangeScan.size());
-            Set<Double> latestValuesBulkScan = new HashSet<Double>();
+            Set<Double> latestValuesBulkScan = new HashSet<>();
             Map<String, NavigableMap<Long, Object>> fieldValues2 = crawlDAO.fetchFieldValues(rowKeys, "f1", k);
             for (NavigableMap.Entry<String, NavigableMap<Long, Object>> e : fieldValues2.entrySet()) {
                 latestValuesBulkScan.add((Double) e.getValue().lastEntry().getValue());

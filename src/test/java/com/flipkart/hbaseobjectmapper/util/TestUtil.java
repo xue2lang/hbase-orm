@@ -27,10 +27,12 @@ public class TestUtil {
         return new Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>(record, classDescription, clazz);
     }
 
+    @SafeVarargs
     public static <T> T[] a(T... a) {
         return a;
     }
 
+    @SafeVarargs
     public static <T> Set<T> s(T... a) {
         return Sets.newHashSet(a);
     }

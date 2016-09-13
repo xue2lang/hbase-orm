@@ -6,9 +6,9 @@ import com.flipkart.hbaseobjectmapper.entities.EmployeeSummary;
 import com.flipkart.hbaseobjectmapper.mr.samples.EmployeeMapper;
 import com.flipkart.hbaseobjectmapper.mr.samples.EmployeeReducer;
 import com.flipkart.hbaseobjectmapper.util.mr.AbstractMRTest;
+import com.flipkart.hbaseobjectmapper.util.mr.MRTestUtil;
 import com.flipkart.hbaseobjectmapper.util.mr.TableMapDriver;
 import com.flipkart.hbaseobjectmapper.util.mr.TableReduceDriver;
-import com.flipkart.hbaseobjectmapper.util.mr.MRTestUtil;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -40,11 +40,10 @@ public class TestEmployeeMR extends AbstractMRTest {
     @Test
     public void testSingleMapper() throws IOException {
         Employee employee = (Employee) TestObjects.validEmployeeObjectsNoVersion.get(1);
-        org.apache.hadoop.hbase.util.Pair<ImmutableBytesWritable, Result> rowKeyResultPair = hbObjectMapper.writeValueAsRowKeyResultPair(employee);
         employeeMapDriver
                 .withInput(
-                        rowKeyResultPair.getFirst(), // this line can alternatively be hbObjectMapper.getRowKey(employee)
-                        rowKeyResultPair.getSecond() // this line can alternatively be hbObjectMapper.writeValueAsResult(employee)
+                        hbObjectMapper.getRowKey(employee),
+                        hbObjectMapper.writeValueAsResult(employee)
 
                 )
                 .withOutput(hbObjectMapper.rowKeyToIbw("key"), new IntWritable(employee.getReporteeCount()))

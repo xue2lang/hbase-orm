@@ -38,7 +38,7 @@ public class TestObjects {
     );
 
     private static List<HBRecord> asList(HBRecord... hbRecords) {
-        List<HBRecord> output = new ArrayList<HBRecord>();
+        List<HBRecord> output = new ArrayList<>();
         Collections.addAll(output, hbRecords);
         return output;
     }

@@ -24,7 +24,7 @@ public class Crawl implements HBRecord<String> {
 
     public Crawl(String key) {
         this.key = key;
-        this.f1 = new TreeMap<Long, Double>();
+        this.f1 = new TreeMap<>();
     }
 
     @Override

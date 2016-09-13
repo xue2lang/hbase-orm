@@ -72,8 +72,9 @@ public class TestHBObjectMapper {
         System.out.printf("Time taken for Result+Row->POJO = %dms%n%n", end - start);
     }
 
-    private <R extends Serializable & Comparable<R>> List<HBRecord<R>> l(HBRecord<R>... records) {
-        ArrayList<HBRecord<R>> list = new ArrayList<HBRecord<R>>();
+    @SafeVarargs
+    private final <R extends Serializable & Comparable<R>> List<HBRecord<R>> l(HBRecord<R>... records) {
+        ArrayList<HBRecord<R>> list = new ArrayList<>();
         Collections.addAll(list, records);
         return list;
 
@@ -122,7 +123,7 @@ public class TestHBObjectMapper {
 
     @Test
     public void testInvalidClasses() throws DeserializationException {
-        Set<String> exceptionMessages = new HashSet<String>();
+        Set<String> exceptionMessages = new HashSet<>();
         for (Triplet<HBRecord, String, Class<? extends IllegalArgumentException>> p : invalidRecordsAndErrorMessages) {
             HBRecord record = p.getValue0();
             Class recordClass = record.getClass();

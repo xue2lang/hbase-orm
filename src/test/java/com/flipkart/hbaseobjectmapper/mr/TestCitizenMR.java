@@ -6,9 +6,9 @@ import com.flipkart.hbaseobjectmapper.entities.CitizenSummary;
 import com.flipkart.hbaseobjectmapper.mr.samples.CitizenMapper;
 import com.flipkart.hbaseobjectmapper.mr.samples.CitizenReducer;
 import com.flipkart.hbaseobjectmapper.util.mr.AbstractMRTest;
+import com.flipkart.hbaseobjectmapper.util.mr.MRTestUtil;
 import com.flipkart.hbaseobjectmapper.util.mr.TableMapDriver;
 import com.flipkart.hbaseobjectmapper.util.mr.TableReduceDriver;
-import com.flipkart.hbaseobjectmapper.util.mr.MRTestUtil;
 import org.apache.hadoop.hbase.client.Mutation;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
@@ -40,11 +40,10 @@ public class TestCitizenMR extends AbstractMRTest {
     @Test
     public void testSingleMapper() throws IOException {
         Citizen citizen = (Citizen) TestObjects.validCitizenObjects.get(0);
-        org.apache.hadoop.hbase.util.Pair<ImmutableBytesWritable, Result> rowKeyResultPair = hbObjectMapper.writeValueAsRowKeyResultPair(citizen);
         citizenMapDriver
                 .withInput(
-                        rowKeyResultPair.getFirst(), // this line can alternatively be hbObjectMapper.getRowKey(citizen)
-                        rowKeyResultPair.getSecond() // this line can alternatively be hbObjectMapper.writeValueAsResult(citizen)
+                        hbObjectMapper.getRowKey(citizen),
+                        hbObjectMapper.writeValueAsResult(citizen)
 
                 )
                 .withOutput(hbObjectMapper.rowKeyToIbw("key"), new IntWritable(citizen.getAge()))
