@@ -12,7 +12,7 @@ import org.junit.Test;
 import java.io.Serializable;
 import java.util.*;
 
-import static com.flipkart.hbaseobjectmapper.TestUtil.triplet;
+import static com.flipkart.hbaseobjectmapper.util.TestUtil.triplet;
 import static org.junit.Assert.*;
 
 public class TestHBObjectMapper {

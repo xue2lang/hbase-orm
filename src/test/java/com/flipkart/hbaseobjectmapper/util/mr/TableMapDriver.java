@@ -1,4 +1,4 @@
-package com.flipkart.hbaseobjectmapper.mr.lib;
+package com.flipkart.hbaseobjectmapper.util.mr;
 
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;

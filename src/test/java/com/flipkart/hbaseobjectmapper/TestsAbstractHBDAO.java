@@ -7,10 +7,10 @@ import com.flipkart.hbaseobjectmapper.daos.CrawlNoVersionDAO;
 import com.flipkart.hbaseobjectmapper.entities.Citizen;
 import com.flipkart.hbaseobjectmapper.entities.Crawl;
 import com.flipkart.hbaseobjectmapper.entities.CrawlNoVersion;
-import com.google.common.collect.Sets;
+import com.flipkart.hbaseobjectmapper.util.cluster.HBaseCluster;
+import com.flipkart.hbaseobjectmapper.util.cluster.InMemoryHBaseCluster;
+import com.flipkart.hbaseobjectmapper.util.cluster.RealHBaseCluster;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.*;
-import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -18,135 +18,66 @@ import org.junit.Test;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.*;
 
+import static com.flipkart.hbaseobjectmapper.util.TestUtil.*;
 import static org.junit.Assert.*;
 
 public class TestsAbstractHBDAO {
-    final HBaseTestingUtility utility = new HBaseTestingUtility();
-    Configuration configuration;
-    CitizenDAO citizenDao;
-    CitizenSummaryDAO citizenSummaryDAO;
-    CrawlDAO crawlDAO;
-    CrawlNoVersionDAO crawlNoVersionDAO;
-    final List<Citizen> testObjs = TestObjects.validCitizenObjectsNoVersion;
-    final static long CLUSTER_START_TIMEOUT = 60;
-
-    class ClusterStarter implements Callable<MiniHBaseCluster> {
-        private final HBaseTestingUtility utility;
-
-        public ClusterStarter(HBaseTestingUtility utility) {
-            this.utility = utility;
-        }
-
-        @Override
-        public MiniHBaseCluster call() throws Exception {
-            System.out.println("Starting HBase Test Cluster (in-memory)...");
-            return utility.startMiniCluster();
-        }
-    }
-
-    private interface TablesCreator {
-        void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException;
-    }
-
-    private static class ActualTablesCreator implements TablesCreator {
-        private final HBaseAdmin hBaseAdmin;
-
-        private ActualTablesCreator(HBaseAdmin hBaseAdmin) {
-            this.hBaseAdmin = hBaseAdmin;
-        }
-
-        @Override
-        public void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException {
-            if (hBaseAdmin.tableExists(tableName)) {
-                System.out.format("Disabling table '%s': ", tableName);
-                hBaseAdmin.disableTable(tableName);
-                System.out.println("[DONE]");
-                System.out.format("Deleting table '%s': ", tableName);
-                hBaseAdmin.deleteTable(tableName);
-                System.out.println("[DONE]");
-            }
-            HTableDescriptor tableDescriptor = new HTableDescriptor(TableName.valueOf(tableName));
-            for (String columnFamily : columnFamilies) {
-                tableDescriptor.addFamily(new HColumnDescriptor(columnFamily).setMaxVersions(numVersions));
-            }
-            System.out.format("Creating table '%s': ", tableName);
-            hBaseAdmin.createTable(tableDescriptor);
-            System.out.println("[DONE]");
-        }
-    }
-
-    private static class InMemoryTablesCreator implements TablesCreator {
-
-        private final HBaseTestingUtility utility;
-
-        private InMemoryTablesCreator(HBaseTestingUtility utility) {
-            this.utility = utility;
-        }
-
-        @Override
-        public void createTable(String tableName, String[] columnFamilies, int numVersions) throws IOException {
-            byte[][] columnFamiliesBytes = new byte[columnFamilies.length][];
-            for (int i = 0; i < columnFamilies.length; i++) {
-                columnFamiliesBytes[i] = columnFamilies[i].getBytes();
-            }
-            utility.createTable(tableName.getBytes(), columnFamiliesBytes, numVersions);
-        }
-    }
+    private Configuration configuration;
+    private CitizenDAO citizenDao;
+    private CitizenSummaryDAO citizenSummaryDAO;
+    private CrawlDAO crawlDAO;
+    private CrawlNoVersionDAO crawlNoVersionDAO;
+    private HBaseCluster hBaseCluster;
 
     @Before
     public void setup() {
-        String useRegularHBaseClient = System.getenv("USE_REGULAR_HBASE_CLIENT");
+        hBaseCluster = getHBaseCluster();
         try {
-            TablesCreator tablesCreator = null;
-            if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true"))) {
-                configuration = getRegularHBaseClient();
-                System.out.println("Creating HBase admin");
-                HBaseAdmin hBaseAdmin = new HBaseAdmin(configuration);
-                System.out.println("Recreating tables on HBase");
-                tablesCreator = new ActualTablesCreator(hBaseAdmin);
-            } else {
-                try {
-                    System.out.println("Starting test cluster");
-                    ExecutorService executorService = Executors.newSingleThreadExecutor();
-                    executorService.submit(new ClusterStarter(utility)).get(CLUSTER_START_TIMEOUT, TimeUnit.SECONDS);
-                    configuration = utility.getConfiguration();
-                    System.out.println("Creating tables on HBase test cluster");
-                    tablesCreator = new InMemoryTablesCreator(utility);
-                } catch (TimeoutException tox) {
-                    fail("In-memory HBase Test Cluster could not be started in " + CLUSTER_START_TIMEOUT + " seconds - aborted execution of DAO-related test cases");
-                }
-            }
-            createDAOs(tablesCreator);
-        } catch (Exception ioex) {
-            ioex.printStackTrace();
+            configuration = hBaseCluster.init();
+        } catch (Exception e) {
+            e.printStackTrace();
+            fail("Failed to connect to HBase. Aborted execution of DAO-related test cases");
+        }
+        try {
+            createDAOs();
+        } catch (Exception e) {
+            e.printStackTrace();
             fail("Could not setup HBase for testing");
         }
     }
 
-    private void createDAOs(TablesCreator tablesCreator) throws IOException {
-        tablesCreator.createTable("citizens", new String[]{"main", "optional"}, 1);
+    private HBaseCluster getHBaseCluster() {
+        String useRegularHBaseClient = System.getenv("USE_REGULAR_HBASE_CLIENT");
+        if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true")))
+            return new RealHBaseCluster();
+        else
+            return new InMemoryHBaseCluster();
+    }
+
+    private void createDAOs() throws IOException {
+        hBaseCluster.createTable("citizens", a("main", "optional"), 1);
         citizenDao = new CitizenDAO(configuration);
-        tablesCreator.createTable("citizen_summary", new String[]{"a"}, 1);
+        hBaseCluster.createTable("citizens_summary", a("a"), 1);
         citizenSummaryDAO = new CitizenSummaryDAO(configuration);
-        tablesCreator.createTable("crawl", new String[]{"a"}, 3);
+        hBaseCluster.createTable("crawls", a("a"), 3);
         crawlDAO = new CrawlDAO(configuration);
         crawlNoVersionDAO = new CrawlNoVersionDAO(configuration);
     }
 
     public void testTableParticulars() {
         assertEquals(citizenDao.getTableName(), "citizens");
-        assertTrue("Issue with column families of 'citizens' table\n" + citizenDao.getColumnFamilies(), TestUtil.setEquals(citizenDao.getColumnFamilies(), Sets.newHashSet("main", "optional")));
-        assertEquals(citizenSummaryDAO.getTableName(), "citizen_summary");
-        assertTrue("Issue with column families of 'citizen_summary' table\n" + citizenSummaryDAO.getColumnFamilies(), TestUtil.setEquals(citizenSummaryDAO.getColumnFamilies(), Sets.newHashSet("a")));
+        assertTrue("Issue with column families of 'citizens' table\n" + citizenDao.getColumnFamilies(), setEquals(citizenDao.getColumnFamilies(), s("main", "optional")));
+        assertEquals(citizenSummaryDAO.getTableName(), "citizens_summary");
+        assertTrue("Issue with column families of 'citizens_summary' table\n" + citizenSummaryDAO.getColumnFamilies(), setEquals(citizenSummaryDAO.getColumnFamilies(), s("a")));
     }
 
     public void testHBaseDAO() throws IOException {
+        final List<Citizen> testObjs = TestObjects.validCitizenObjectsNoVersion;
         String[] rowKeys = new String[testObjs.size()];
         Map<String, Map<String, Object>> expectedFieldValues = new HashMap<String, Map<String, Object>>();
         for (int i = 0; i < testObjs.size(); i++) {
-            Citizen e = testObjs.get(i);
+            HBRecord<String> e = testObjs.get(i);
             try {
                 final String rowKey = citizenDao.persist(e);
                 rowKeys[i] = rowKey;
@@ -198,8 +129,8 @@ public class TestsAbstractHBDAO {
         for (String f : citizenDao.getFields()) {
             Map<String, Object> actualFieldValues = citizenDao.fetchFieldValues(rowKeys, f);
             Map<String, Object> actualFieldValuesScanned = citizenDao.fetchFieldValues("A", "z", f);
-            assertTrue(String.format("Invalid data returned when values for column \"%s\" were fetched in bulk\nExpected: %s\nActual: %s", f, expectedFieldValues.get(f), actualFieldValues), TestUtil.mapEquals(actualFieldValues, expectedFieldValues.get(f)));
-            assertTrue("Difference between 'bulk fetch by array of row keys' and 'bulk fetch by range of row keys'", TestUtil.mapEquals(actualFieldValues, actualFieldValuesScanned));
+            assertTrue(String.format("Invalid data returned when values for column \"%s\" were fetched in bulk\nExpected: %s\nActual: %s", f, expectedFieldValues.get(f), actualFieldValues), mapEquals(actualFieldValues, expectedFieldValues.get(f)));
+            assertTrue("Difference between 'bulk fetch by array of row keys' and 'bulk fetch by range of row keys'", mapEquals(actualFieldValues, actualFieldValuesScanned));
         }
         Map<String, Object> actualSalaries = citizenDao.fetchFieldValues(rowKeys, "sal");
         long actualSumOfSalaries = 0;
@@ -324,11 +255,6 @@ public class TestsAbstractHBDAO {
 
     @After
     public void tearDown() throws Exception {
-        System.out.println("Shutting down in-memory cluster");
-        utility.shutdownMiniCluster();
-    }
-
-    private Configuration getRegularHBaseClient() {
-        return HBaseConfiguration.create();
+        hBaseCluster.end();
     }
 }

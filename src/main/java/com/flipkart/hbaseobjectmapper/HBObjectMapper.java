@@ -119,7 +119,6 @@ public class HBObjectMapper {
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Class<T> entityClass) throws DeserializationException {
         try {
             return (R) byteArrayToValue(rowKeyBytes, entityClass.getDeclaredMethod("composeRowKey").getReturnType(), false);
-
         } catch (NoSuchMethodException e) {
             throw new InternalError(e);
         }
@@ -514,11 +513,11 @@ public class HBObjectMapper {
      * @param clazz  {@link Class} to which you want to convert to (must extend {@link HBRecord} class)
      * @return Bean-like object
      */
-    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(String rowKey, Result result, Class<T> clazz) throws DeserializationException {
+    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Result result, Class<T> clazz) throws DeserializationException {
         if (rowKey == null)
             return readValueFromResult(result, clazz);
         else
-            return readValueFromRowAndResult(Bytes.toBytes(rowKey), result, clazz);
+            return readValueFromRowAndResult(rowKeyToBytes(rowKey), result, clazz);
     }
 
     private boolean isResultEmpty(Result result) {

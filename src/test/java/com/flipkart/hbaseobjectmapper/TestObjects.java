@@ -11,7 +11,7 @@ import org.javatuples.Triplet;
 import java.math.BigDecimal;
 import java.util.*;
 
-import static com.flipkart.hbaseobjectmapper.TestUtil.triplet;
+import static com.flipkart.hbaseobjectmapper.util.TestUtil.triplet;
 
 
 public class TestObjects {
@@ -32,8 +32,9 @@ public class TestObjects {
             new Citizen("IND", 105, "Nilesh", null, null, null, null, null, null, null, null, null, null, new Dependents(null, Arrays.asList(141, 142)))
     );
 
-    public static final List<HBRecord> validOtherObjectsNoVersion = asList(
-            new Employee(1L, "Raja")
+    public static final List<HBRecord> validEmployeeObjectsNoVersion = asList(
+            new Employee(1L, "Raja", (short) 0),
+            new Employee(2L, "Ramnik", (short) 8)
     );
 
     private static List<HBRecord> asList(HBRecord... hbRecords) {
@@ -42,7 +43,7 @@ public class TestObjects {
         return output;
     }
 
-    public static final List<Citizen> validObjectsWithHBColumnMultiVersion = Arrays.asList(
+    public static final List<Citizen> validCitizenObjectsWithHBColumnMultiVersion = Arrays.asList(
             new Citizen("IND", 106, "Ram", null, 30000, true, null, null, null, null, null, new TreeMap<Long, Integer>() {
                 {
                     put(System.currentTimeMillis() - 365L * 86400L * 1000L, 20000); // last year
@@ -57,13 +58,20 @@ public class TestObjects {
             }, null, null)
     );
 
-    public static final List<HBRecord> validObjects = new ArrayList<HBRecord>() {
+    public static final List<HBRecord> validCitizenObjects = new ArrayList<HBRecord>() {
         {
             addAll(TestObjects.validCitizenObjectsNoVersion);
-            addAll(TestObjects.validOtherObjectsNoVersion);
-            addAll(TestObjects.validObjectsWithHBColumnMultiVersion);
+            addAll(TestObjects.validCitizenObjectsWithHBColumnMultiVersion);
         }
     };
+
+    public static final List<HBRecord> validObjects = new ArrayList<HBRecord>() {
+        {
+            addAll(TestObjects.validCitizenObjects);
+            addAll(TestObjects.validEmployeeObjectsNoVersion);
+        }
+    };
+
     @SuppressWarnings("unchecked")
     public static final List<Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>> invalidObjects = Arrays.asList(
             triplet(new Citizen("IND", -1, null, null, null, null, null, null, null, null, null, null, null, null), "all fields empty", AllHBColumnFieldsNullException.class),

@@ -1,29 +1,13 @@
-package com.flipkart.hbaseobjectmapper;
+package com.flipkart.hbaseobjectmapper.util;
 
-import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
-import org.apache.hadoop.mrunit.types.Pair;
+import com.flipkart.hbaseobjectmapper.HBRecord;
+import com.google.common.collect.Sets;
 import org.javatuples.Triplet;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class TestUtil {
-    private static final HBObjectMapper hbObjectMapper = new HBObjectMapper();
-
-    public static Pair<ImmutableBytesWritable, Result> writeValueAsRowKeyResultPair(HBRecord obj) {
-        return new Pair<ImmutableBytesWritable, Result>(hbObjectMapper.getRowKey(obj), hbObjectMapper.writeValueAsResult(obj));
-    }
-
-    public static List<Pair<ImmutableBytesWritable, Result>> writeValueAsRowKeyResultPair(List<? extends HBRecord> objs) {
-        List<Pair<ImmutableBytesWritable, Result>> pairList = new ArrayList<Pair<ImmutableBytesWritable, Result>>(objs.size());
-        for (HBRecord obj : objs) {
-            pairList.add(writeValueAsRowKeyResultPair(obj));
-        }
-        return pairList;
-    }
 
     public static <T> boolean setEquals(Set<T> leftSet, Set<T> rightSet) {
         return !(leftSet == null || rightSet == null || leftSet.size() != rightSet.size()) && rightSet.containsAll(leftSet);
@@ -43,5 +27,11 @@ public class TestUtil {
         return new Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>(record, classDescription, clazz);
     }
 
+    public static <T> T[] a(T... a) {
+        return a;
+    }
 
+    public static <T> Set<T> s(T... a) {
+        return Sets.newHashSet(a);
+    }
 }

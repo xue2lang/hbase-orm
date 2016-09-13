@@ -9,7 +9,7 @@ import lombok.ToString;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
-@HBTable("crawl")
+@HBTable("crawls")
 @ToString
 public class Crawl implements HBRecord<String> {
     @HBRowKey
