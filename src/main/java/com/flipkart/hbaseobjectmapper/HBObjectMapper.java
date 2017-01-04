@@ -6,8 +6,6 @@ import com.flipkart.hbaseobjectmapper.codec.JacksonJsonCodec;
 import com.flipkart.hbaseobjectmapper.codec.SerializationException;
 import com.flipkart.hbaseobjectmapper.exceptions.*;
 import com.flipkart.hbaseobjectmapper.exceptions.InternalError;
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HConstants;
@@ -20,7 +18,6 @@ import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.Serializable;
 import java.lang.reflect.*;
-import java.math.BigDecimal;
 import java.util.*;
 
 /**
@@ -32,70 +29,10 @@ public class HBObjectMapper {
 
     private static final Codec DEFAULT_CODEC = new JacksonJsonCodec();
 
-    private static final Map<Class, String> fromBytesMethodNames = new HashMap<Class, String>() {
-        {
-            put(Boolean.class, "toBoolean");
-            put(Short.class, "toShort");
-            put(Integer.class, "toInt");
-            put(Long.class, "toLong");
-            put(Float.class, "toFloat");
-            put(Double.class, "toDouble");
-            put(String.class, "toString");
-            put(BigDecimal.class, "toBigDecimal");
-        }
-    };
-
-    private static final BiMap<Class, Class> nativeCounterParts = HashBiMap.create(new HashMap<Class, Class>() {
-        {
-            put(Boolean.class, boolean.class);
-            put(Short.class, short.class);
-            put(Long.class, long.class);
-            put(Integer.class, int.class);
-            put(Float.class, float.class);
-            put(Double.class, double.class);
-        }
-    });
-
-    private static final Map<Class, Method> fromBytesMethods, toBytesMethods;
-    private static final Map<Class, Constructor> constructors;
-
-    static {
-        try {
-            fromBytesMethods = new HashMap<>(fromBytesMethodNames.size());
-            toBytesMethods = new HashMap<>(fromBytesMethodNames.size());
-            constructors = new HashMap<>(fromBytesMethodNames.size());
-            Method fromBytesMethod, toBytesMethod;
-            Constructor<?> constructor;
-            for (Map.Entry<Class, String> e : fromBytesMethodNames.entrySet()) {
-                Class<?> clazz = e.getKey();
-                String toDataTypeMethodName = e.getValue();
-                fromBytesMethod = Bytes.class.getDeclaredMethod(toDataTypeMethodName, byte[].class);
-                toBytesMethod = Bytes.class.getDeclaredMethod("toBytes", nativeCounterParts.containsKey(clazz) ? nativeCounterParts.get(clazz) : clazz);
-                constructor = clazz.getConstructor(String.class);
-                fromBytesMethods.put(clazz, fromBytesMethod);
-                toBytesMethods.put(clazz, toBytesMethod);
-                constructors.put(clazz, constructor);
-            }
-        } catch (Exception ex) {
-            throw new BadHBaseLibStateException(ex);
-        }
-    }
-
     private final Codec codec;
 
     /**
      * Instantiate object of this class with a custom {@link Codec}
-     * <p>
-     * <b>Note</b>: For following java types, HBase's native serializers/deserializers are used, irrespective of what codec you specify: <ul>
-     * <li>{@link Boolean}</li>
-     * <li>{@link Short}</li>
-     * <li>{@link Integer}</li>
-     * <li>{@link Long}</li>
-     * <li>{@link Float}</li>
-     * <li>{@link Double}</li>
-     * <li>{@link String}</li>
-     * <li>{@link BigDecimal}</li>
-     * </ul>
      *
      * @param codec Codec to be used for serialization and deserialization of fields
      */
@@ -177,20 +114,13 @@ public class HBObjectMapper {
      */
     public <R extends Serializable & Comparable<R>> byte[] valueToByteArray(R value, boolean serializeAsString) {
         try {
-            if (value == null)
-                return null;
-            Class<? extends Serializable> clazz = value.getClass();
-            if (toBytesMethods.containsKey(clazz)) {
-                Method toBytesMethod = toBytesMethods.get(clazz);
-                return serializeAsString ? Bytes.toBytes(String.valueOf(value)) : (byte[]) toBytesMethod.invoke(null, value);
-            } else {
-                try {
-                    return codec.serialize(value);
-                } catch (SerializationException jpx) {
-                    throw new ConversionFailedException(String.format("Don't know how to convert field of type %s to byte array", clazz.getName()));
-                }
+            try {
+                return codec.serialize(value, null);
+            } catch (SerializationException jpx) {
+                throw new ConversionFailedException("Don't know how to convert field to byte array");
             }
-        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+
+        } catch (IllegalArgumentException e) {
             throw new BadHBaseLibStateException(e);
         }
     }
@@ -272,7 +202,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Internal note: This should be in sync with {@link #validateHBColumnMultiVersionField(Field)}
+     * Internal note: For multi-version usecase, this should be in sync with {@link #validateHBColumnMultiVersionField(Field)}
      */
     Type getFieldType(Field field, boolean isMultiVersioned) {
         if (isMultiVersioned) {
@@ -288,8 +218,7 @@ public class HBObjectMapper {
         if (fieldType instanceof Class) {
             Class fieldClazz = (Class) fieldType;
             if (fieldClazz.isPrimitive()) {
-                String suggestion = nativeCounterParts.containsValue(fieldClazz) ? String.format("- Use type %s instead", nativeCounterParts.inverse().get(fieldClazz).getName()) : "";
-                throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable) %s", field.getName(), field.getDeclaringClass().getName(), fieldClazz.getName(), suggestion));
+                throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable)", field.getName(), field.getDeclaringClass().getName(), fieldClazz.getName()));
             }
         }
         if (!codec.canDeserialize(fieldType)) {
@@ -563,27 +492,8 @@ public class HBObjectMapper {
     Object byteArrayToValue(byte[] value, Type type, boolean serializeAsString) throws DeserializationException {
         if (value == null || value.length == 0)
             return null;
-        Object fieldValue;
-        try {
-            if (type instanceof Class && fromBytesMethods.containsKey(type)) {
-                if (serializeAsString) {
-                    Constructor constructor = constructors.get(type);
-                    try {
-                        fieldValue = constructor.newInstance(Bytes.toString(value));
-                    } catch (Exception ex) {
-                        fieldValue = null;
-                    }
-                } else {
-                    Method method = fromBytesMethods.get(type);
-                    fieldValue = method.invoke(null, new Object[]{value});
-                }
-            } else {
-                return codec.deserialize(value, type);
-            }
-            return fieldValue;
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new BadHBaseLibStateException(e);
-        }
+        else
+            return codec.deserialize(value, type, null);
     }
 
     /**

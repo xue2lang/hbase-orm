@@ -22,13 +22,11 @@ class WrappedHBColumn {
         if (hbColumn != null) {
             family = hbColumn.family();
             column = hbColumn.column();
-            serializeAsString = hbColumn.serializeAsString();
             singleVersioned = true;
             annotationClass = HBColumn.class;
         } else if (hbColumnMultiVersion != null) {
             family = hbColumnMultiVersion.family();
             column = hbColumnMultiVersion.column();
-            serializeAsString = hbColumnMultiVersion.serializeAsString();
             multiVersioned = true;
             annotationClass = HBColumnMultiVersion.class;
         }

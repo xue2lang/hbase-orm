@@ -5,6 +5,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Type;
 
 /**
  * Maps an entity field of type <code>NavigableMap&lt;Long, T&gt;</code> to an HBase column (where <code>T</code> is a {@link Serializable} type)
@@ -24,7 +25,8 @@ public @interface HBColumnMultiVersion {
     String column();
 
     /**
-     * (Applicable to numeric fields) Store field value in it's string representation (e.g. (int)560034 is stored as "560034")
+     * Optional custom flags that will be passed to your {@link com.flipkart.hbaseobjectmapper.codec.Codec#serialize(Serializable) serialize} and {@link com.flipkart.hbaseobjectmapper.codec.Codec#deserialize(byte[], Type) deserialize} methods as a <code>Map&lt;String, String&gt;</code>
      */
-    boolean serializeAsString() default false;
+    String[] flags() default {};
+
 }

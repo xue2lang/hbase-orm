@@ -10,7 +10,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.flipkart</groupId>
     <artifactId>hbase-object-mapper</artifactId>
-    <version>1.4.1</version>
+    <version>1.5</version>
     <url>https://github.com/flipkart-incubator/hbase-object-mapper#readme</url>
     <scm>
         <url>https://github.com/flipkart-incubator/hbase-object-mapper</url>
@@ -58,11 +58,6 @@
             <groupId>org.apache.hbase</groupId>
             <artifactId>hbase-client</artifactId>
             <version>${version.hbase}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-            <version>14.0.1</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

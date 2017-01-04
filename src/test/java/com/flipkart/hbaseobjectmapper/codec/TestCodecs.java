@@ -66,8 +66,8 @@ public class TestCodecs {
     }
 
     private void verifySerDe(Codec codec, String fieldFullName, Type type, Serializable fieldValue) throws SerializationException, DeserializationException {
-        byte[] bytes = codec.serialize(fieldValue);
-        Serializable deserializedFieldValue = codec.deserialize(bytes, type);
+        byte[] bytes = codec.serialize(fieldValue, null);
+        Serializable deserializedFieldValue = codec.deserialize(bytes, type, null);
         assertEquals(String.format("Field %s got corrupted after serialization and deserialization of it's value:\n%s\n", fieldFullName, fieldValue), fieldValue, deserializedFieldValue);
     }
 }
