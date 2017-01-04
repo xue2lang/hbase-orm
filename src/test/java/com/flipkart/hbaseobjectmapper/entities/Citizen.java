@@ -34,11 +34,11 @@ public class Citizen implements HBRecord<String> {
     private Long f3;
     @HBColumn(family = "optional", column = "f4")
     private BigDecimal f4;
-    @HBColumn(family = "optional", column = "pincode")
+    @HBColumn(family = "optional", column = "pincode", codecFlags = {@Flag(name = "serializeAsString", value = "true")})
     private Integer pincode;
     @HBColumnMultiVersion(family = "optional", column = "phone_number")
     private NavigableMap<Long, Integer> phoneNumberHistory;
-    @HBColumn(family = "optional", column = "flags")
+    @HBColumn(family = "optional", column = "codecFlags")
     private Map<String, Integer> extraFlags;
     @HBColumn(family = "optional", column = "dependents")
     private Dependents dependents;

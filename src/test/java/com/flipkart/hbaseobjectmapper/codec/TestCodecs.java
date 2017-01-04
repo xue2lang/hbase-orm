@@ -24,8 +24,8 @@ public class TestCodecs {
     }
 
     @Test
-    public void testJacksonJsonCodec() {
-        testWithCodec(new JacksonJsonCodec());
+    public void testHBaseNativePlusJacksonJsonCodec() {
+        testWithCodec(new HBaseNativePlusJacksonJsonCodec());
     }
 
     @SuppressWarnings("unchecked")

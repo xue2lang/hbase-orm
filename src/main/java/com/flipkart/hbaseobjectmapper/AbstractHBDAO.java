@@ -316,7 +316,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
             final String rowKey = Bytes.toString(CellUtil.cloneRow(cell));
             if (!map.containsKey(rowKey))
                 map.put(rowKey, new TreeMap<Long, Object>());
-            map.get(rowKey).put(cell.getTimestamp(), hbObjectMapper.byteArrayToValue(CellUtil.cloneValue(cell), fieldType, hbColumn.serializeAsString()));
+            map.get(rowKey).put(cell.getTimestamp(), hbObjectMapper.byteArrayToValue(CellUtil.cloneValue(cell), fieldType, hbColumn.codecFlags()));
         }
     }
 

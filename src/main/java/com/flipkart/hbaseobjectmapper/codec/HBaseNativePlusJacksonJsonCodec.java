@@ -16,12 +16,15 @@ import java.util.Map;
 /**
  * A codec that:<ul>
  * <li>Uses HBase's native methods to serialize/deserialize objects of types {@link Boolean}, {@link Short}, {@link Integer}, {@link Long}, {@link Float}, {@link Double}, {@link String} and {@link BigDecimal}</li>
- * <li>Uses Jackson's serializer/deserializer for all other types (JSON)</li>
+ * <li>Uses Jackson's JSON serializer/deserializer for all other types</li>
  * <li>Serializes <code>null</code> as <code>null</code></li>
  * </ul>
+ * <p>
+ * Takes following parameter:
+ * serializeAsString (Applicable to numeric fields) Store field value in it's string representation (e.g. (int)560034 is stored as "560034")
  */
 
-public class JacksonJsonCodec implements Codec {
+public class HBaseNativePlusJacksonJsonCodec implements Codec {
     private static final Map<Class, String> fromBytesMethodNames = new HashMap<Class, String>() {
         {
             put(Boolean.class, "toBoolean");
@@ -73,42 +76,21 @@ public class JacksonJsonCodec implements Codec {
 
 
     private final ObjectMapper objectMapper;
-    private final boolean serializeAsString;
 
     /**
-     * Construct an object of class {@link JacksonJsonCodec} with custom instance of Jackson's Object Mapper and specify whether all numeric fields of input object have to serialized as string before finally getting serialized to `byte[]`
-     *
-     * @param objectMapper      Instance of Jackson's Object Mapper
-     * @param serializeAsString (Applicable to numeric fields) Store field value in it's string representation (e.g. (int)560034 is stored as "560034")
-     */
-    public JacksonJsonCodec(ObjectMapper objectMapper, boolean serializeAsString) {
-        this.objectMapper = objectMapper;
-        this.serializeAsString = serializeAsString;
-    }
-
-    /**
-     * Construct an object of class {@link JacksonJsonCodec} with custom instance of Jackson's Object Mapper
+     * Construct an object of class {@link HBaseNativePlusJacksonJsonCodec} with custom instance of Jackson's Object Mapper
      *
      * @param objectMapper Instance of Jackson's Object Mapper
      */
-    public JacksonJsonCodec(ObjectMapper objectMapper) {
-        this(objectMapper, false);
+    public HBaseNativePlusJacksonJsonCodec(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
     }
 
     /**
-     * Construct an object of class {@link JacksonJsonCodec} and specify whether all numeric fields of input object have to serialized as string before finally getting serialized to `byte[]`
-     *
-     * @param serializeAsString (Applicable to numeric fields) Store field value in it's string representation (e.g. (int)560034 is stored as "560034")
+     * Construct an object of class {@link HBaseNativePlusJacksonJsonCodec}
      */
-    public JacksonJsonCodec(boolean serializeAsString) {
-        this(new ObjectMapper(), serializeAsString);
-    }
-
-    /**
-     * Construct an object of class {@link JacksonJsonCodec} with default settings
-     */
-    public JacksonJsonCodec() {
-        this(false);
+    public HBaseNativePlusJacksonJsonCodec() {
+        this(new ObjectMapper());
     }
 
     /*
@@ -120,6 +102,7 @@ public class JacksonJsonCodec implements Codec {
             return null;
         Class clazz = object.getClass();
         if (toBytesMethods.containsKey(clazz)) {
+            boolean serializeAsString = isSerializeAsStringOn(flags);
             try {
                 Method toBytesMethod = toBytesMethods.get(clazz);
                 return serializeAsString ? Bytes.toBytes(String.valueOf(object)) : (byte[]) toBytesMethod.invoke(null, object);
@@ -143,6 +126,7 @@ public class JacksonJsonCodec implements Codec {
         if (bytes == null)
             return null;
         if (type instanceof Class && fromBytesMethods.containsKey(type)) {
+            boolean serializeAsString = isSerializeAsStringOn(flags);
             try {
                 Serializable fieldValue;
                 if (serializeAsString) {
@@ -174,5 +158,9 @@ public class JacksonJsonCodec implements Codec {
     public boolean canDeserialize(Type type) {
         JavaType javaType = objectMapper.constructType(type);
         return objectMapper.canDeserialize(javaType);
+    }
+
+    private boolean isSerializeAsStringOn(Map<String, String> flags) {
+        return flags != null && flags.get("serializeAsString") != null && flags.get("serializeAsString").equalsIgnoreCase("true");
     }
 }
