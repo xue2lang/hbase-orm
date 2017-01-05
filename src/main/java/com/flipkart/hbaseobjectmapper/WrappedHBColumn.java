@@ -8,13 +8,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A wrapper class for {@link HBColumn} and {@link HBColumnMultiVersion} annotations
+ * A wrapper class for {@link HBColumn} and {@link HBColumnMultiVersion} annotations (internal use only)
  */
 class WrappedHBColumn {
     private String family, column;
     private boolean multiVersioned = false, singleVersioned = false;
     private Class annotationClass;
-    private Map<String, String> flags;
+    private Map<String, String> codecFlags;
 
     WrappedHBColumn(Field field) {
         HBColumn hbColumn = field.getAnnotation(HBColumn.class);
@@ -27,19 +27,19 @@ class WrappedHBColumn {
             column = hbColumn.column();
             singleVersioned = true;
             annotationClass = HBColumn.class;
-            flags = toMap(hbColumn.codecFlags());
+            codecFlags = toMap(hbColumn.codecFlags());
         } else if (hbColumnMultiVersion != null) {
             family = hbColumnMultiVersion.family();
             column = hbColumnMultiVersion.column();
             multiVersioned = true;
             annotationClass = HBColumnMultiVersion.class;
-            flags = toMap(hbColumnMultiVersion.codecFlags());
+            codecFlags = toMap(hbColumnMultiVersion.codecFlags());
         }
     }
 
-    private Map<String, String> toMap(Flag[] flags) {
+    private Map<String, String> toMap(Flag[] codecFlags) {
         Map<String, String> flagsMap = new HashMap<>();
-        for (Flag flag : flags) {
+        for (Flag flag : codecFlags) {
             flagsMap.put(flag.name(), flag.value());
         }
         return flagsMap;
@@ -54,7 +54,7 @@ class WrappedHBColumn {
     }
 
     public Map<String, String> codecFlags() {
-        return flags;
+        return codecFlags;
     }
 
     public boolean isPresent() {

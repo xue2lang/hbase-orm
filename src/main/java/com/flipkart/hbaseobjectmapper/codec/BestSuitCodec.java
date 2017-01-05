@@ -14,17 +14,20 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A codec that:<ul>
- * <li>Uses HBase's native methods to serialize/deserialize objects of types {@link Boolean}, {@link Short}, {@link Integer}, {@link Long}, {@link Float}, {@link Double}, {@link String} and {@link BigDecimal}</li>
- * <li>Uses Jackson's JSON serializer/deserializer for all other types</li>
- * <li>Serializes <code>null</code> as <code>null</code></li>
- * </ul>
+ * This is an implementation of {@link Codec} that:
+ * <ol>
+ * <li>uses HBase's native methods to serialize objects of data types {@link Boolean}, {@link Short}, {@link Integer}, {@link Long}, {@link Float}, {@link Double}, {@link String} and {@link BigDecimal}</li>
+ * <li>uses Jackson's JSON serializer for all other data types</li>
+ * <li>serializes <code>null</code> as <code>null</code></li>
+ * </ol>
  * <p>
- * Takes following parameter:
- * serializeAsString (Applicable to numeric fields) Store field value in it's string representation (e.g. (int)560034 is stored as "560034")
+ * This codec takes following {@link com.flipkart.hbaseobjectmapper.Flag Flag}s:
+ * <ul>
+ * <li><code>serializeAsString</code>: When passed, it indicates this codec to store field value in it's string representation (e.g. 560034 is stored as "560034"). This flags applies only to fields of data types in point 1 above</li>
+ * </ul>
  */
 
-public class HBaseNativePlusJacksonJsonCodec implements Codec {
+public class BestSuitCodec implements Codec {
     private static final Map<Class, String> fromBytesMethodNames = new HashMap<Class, String>() {
         {
             put(Boolean.class, "toBoolean");
@@ -78,18 +81,18 @@ public class HBaseNativePlusJacksonJsonCodec implements Codec {
     private final ObjectMapper objectMapper;
 
     /**
-     * Construct an object of class {@link HBaseNativePlusJacksonJsonCodec} with custom instance of Jackson's Object Mapper
+     * Construct an object of class {@link BestSuitCodec} with custom instance of Jackson's Object Mapper
      *
      * @param objectMapper Instance of Jackson's Object Mapper
      */
-    public HBaseNativePlusJacksonJsonCodec(ObjectMapper objectMapper) {
+    public BestSuitCodec(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     /**
-     * Construct an object of class {@link HBaseNativePlusJacksonJsonCodec}
+     * Construct an object of class {@link BestSuitCodec}
      */
-    public HBaseNativePlusJacksonJsonCodec() {
+    public BestSuitCodec() {
         this(new ObjectMapper());
     }
 

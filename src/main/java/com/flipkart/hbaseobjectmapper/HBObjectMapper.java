@@ -1,8 +1,8 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.codec.BestSuitCodec;
 import com.flipkart.hbaseobjectmapper.codec.Codec;
 import com.flipkart.hbaseobjectmapper.codec.DeserializationException;
-import com.flipkart.hbaseobjectmapper.codec.HBaseNativePlusJacksonJsonCodec;
 import com.flipkart.hbaseobjectmapper.codec.SerializationException;
 import com.flipkart.hbaseobjectmapper.exceptions.*;
 import com.flipkart.hbaseobjectmapper.exceptions.InternalError;
@@ -21,13 +21,13 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /**
- * <p>An object mapper class that helps convert your objects of your bean-like class to HBase's {@link Put} and {@link Result} objects (and vice-versa).</p>
- * <p>This class is for use in MapReduce jobs which read from and/or write to HBase tables and their unit-tests.</p>
+ * <p>An <b>object mapper class</b> that helps convert objects of your bean-like class to HBase's {@link Put} and {@link Result} objects (and vice-versa).</p>
+ * <p>This class is for use in MapReduce jobs which <i>read from</i> and/or <i>write to</i> HBase tables and their unit-tests.</p>
  * <p>This class is thread-safe.</p>
  */
 public class HBObjectMapper {
 
-    private static final Codec DEFAULT_CODEC = new HBaseNativePlusJacksonJsonCodec();
+    private static final Codec DEFAULT_CODEC = new BestSuitCodec();
 
     private final Codec codec;
 
@@ -41,7 +41,7 @@ public class HBObjectMapper {
     }
 
     /**
-     * Instantiate an object of this class with default {@link Codec} of {@link HBaseNativePlusJacksonJsonCodec}
+     * Instantiate an object of this class with default {@link Codec} of {@link BestSuitCodec}
      */
     public HBObjectMapper() {
         this(DEFAULT_CODEC);
@@ -108,14 +108,14 @@ public class HBObjectMapper {
     /**
      * Converts a {@link Serializable} object into a <code>byte[]</code>
      *
-     * @param value Object to be serialized
-     * @param flags Flags to be passed to Codec
+     * @param value      Object to be serialized
+     * @param codecFlags Flags to be passed to Codec
      * @return Byte-array representing serialized object
      */
-    public <R extends Serializable & Comparable<R>> byte[] valueToByteArray(R value, Map<String, String> flags) {
+    public <R extends Serializable & Comparable<R>> byte[] valueToByteArray(R value, Map<String, String> codecFlags) {
         try {
             try {
-                return codec.serialize(value, flags);
+                return codec.serialize(value, codecFlags);
             } catch (SerializationException jpx) {
                 throw new ConversionFailedException("Don't know how to convert field to byte array");
             }

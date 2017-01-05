@@ -6,7 +6,7 @@ import java.lang.reflect.Type;
 import java.util.Map;
 
 /**
- * Interface to control serialization and deserialization within {@link com.flipkart.hbaseobjectmapper.HBObjectMapper HBObjectMapper}
+ * Interface that defines serialization and deserialization behavior for {@link com.flipkart.hbaseobjectmapper.HBObjectMapper HBObjectMapper}
  */
 public interface Codec {
     /**
