@@ -26,7 +26,9 @@ public @interface HBColumn {
     String column();
 
     /**
-     * Optional flags for the default or your custom Codec's {@link com.flipkart.hbaseobjectmapper.codec.Codec#serialize(Serializable, Map) serialize} and {@link com.flipkart.hbaseobjectmapper.codec.Codec#deserialize(byte[], Type, Map) deserialize} methods (as a <code>Map&lt;String, String&gt;</code>)
+     * <b>[optional]</b> flags to be passed to codec's {@link com.flipkart.hbaseobjectmapper.codec.Codec#serialize(Serializable, Map) serialize} and {@link com.flipkart.hbaseobjectmapper.codec.Codec#deserialize(byte[], Type, Map) deserialize} methods
+     * <p>
+     * Note: These flags will be passed as a <code>Map&lt;String, String&gt;</code> (param name and param value)
      */
     Flag[] codecFlags() default {};
 }

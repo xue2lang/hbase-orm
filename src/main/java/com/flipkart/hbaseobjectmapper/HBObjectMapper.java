@@ -47,6 +47,13 @@ public class HBObjectMapper {
         this(DEFAULT_CODEC);
     }
 
+    /**
+     * Serialize row key
+     *
+     * @param rowKey Object representing row key
+     * @param <R>    Data type of row key
+     * @return Byte array
+     */
     <R extends Serializable & Comparable<R>> byte[] rowKeyToBytes(R rowKey) {
         return valueToByteArray(rowKey, null);
     }

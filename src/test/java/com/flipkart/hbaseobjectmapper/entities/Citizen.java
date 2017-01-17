@@ -41,7 +41,7 @@ public class Citizen implements HBRecord<String> {
     @HBColumn(family = "optional", column = "codecFlags")
     private Map<String, Integer> extraFlags;
     @HBColumn(family = "optional", column = "dependents")
-    private Dependents dependents;
+    private Dependents dependents; // Your own class
 
     public Citizen() {
     }

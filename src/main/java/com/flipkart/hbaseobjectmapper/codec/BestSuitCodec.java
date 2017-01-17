@@ -1,5 +1,6 @@
 package com.flipkart.hbaseobjectmapper.codec;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flipkart.hbaseobjectmapper.exceptions.BadHBaseLibStateException;
@@ -21,9 +22,9 @@ import java.util.Map;
  * <li>serializes <code>null</code> as <code>null</code></li>
  * </ol>
  * <p>
- * This codec takes following {@link com.flipkart.hbaseobjectmapper.Flag Flag}s:
+ * This codec takes the following {@link com.flipkart.hbaseobjectmapper.Flag Flag}s:
  * <ul>
- * <li><code>serializeAsString</code>: When passed, it indicates this codec to store field value in it's string representation (e.g. 560034 is stored as "560034"). This flags applies only to fields of data types in point 1 above</li>
+ * <li><b><code>serializeAsString</code></b>: When passed, it indicates this codec to store field value in it's string representation (e.g. <b>560034</b> is serialized into a <code>byte[]</code> that represents the string <b>"560034"</b>). Note that, this flag applies only to fields of data types in point 1 above.</li>
  * </ul>
  */
 
@@ -93,7 +94,13 @@ public class BestSuitCodec implements Codec {
      * Construct an object of class {@link BestSuitCodec}
      */
     public BestSuitCodec() {
-        this(new ObjectMapper());
+        this(getObjectMapper());
+    }
+
+    private static ObjectMapper getObjectMapper() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        return objectMapper;
     }
 
     /*
