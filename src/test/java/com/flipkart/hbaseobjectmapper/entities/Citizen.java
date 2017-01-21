@@ -64,10 +64,12 @@ public class Citizen implements HBRecord<String> {
         this.pincode = pincode;
     }
 
+    @Override
     public String composeRowKey() {
         return String.format("%s%s%d", countryCode, KEY_DELIM, uid);
     }
 
+    @Override
     public void parseRowKey(String rowKey) {
         String[] pieces = rowKey.split(KEY_DELIM);
         this.countryCode = pieces[0];
