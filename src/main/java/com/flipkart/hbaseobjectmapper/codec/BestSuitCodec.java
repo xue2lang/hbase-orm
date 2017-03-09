@@ -56,6 +56,8 @@ public class BestSuitCodec implements Codec {
     private static final Map<Class, Method> fromBytesMethods, toBytesMethods;
     private static final Map<Class, Constructor> constructors;
 
+    public static final String SERIALIZE_AS_STRING = "serializeAsString";
+
     static {
         try {
             fromBytesMethods = new HashMap<>(fromBytesMethodNames.size());
@@ -171,6 +173,6 @@ public class BestSuitCodec implements Codec {
     }
 
     private boolean isSerializeAsStringOn(Map<String, String> flags) {
-        return flags != null && flags.get("serializeAsString") != null && flags.get("serializeAsString").equalsIgnoreCase("true");
+        return flags != null && flags.get(SERIALIZE_AS_STRING) != null && flags.get(SERIALIZE_AS_STRING).equalsIgnoreCase("true");
     }
 }

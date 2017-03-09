@@ -42,7 +42,7 @@ public class Citizen implements HBRecord<String> {
     @HBColumnMultiVersion(family = "tracked", column = "phone_number")
     private NavigableMap<Long, Integer> phoneNumber;
     
-    @HBColumn(family = "optional", column = "pincode", codecFlags = {@Flag(name = "serializeAsString", value = "true")})
+    @HBColumn(family = "optional", column = "pincode", codecFlags = {@Flag(name = BestSuitCodec.SERIALIZE_AS_STRING, value = "true")})
     private Integer pincode;
     
     @Override

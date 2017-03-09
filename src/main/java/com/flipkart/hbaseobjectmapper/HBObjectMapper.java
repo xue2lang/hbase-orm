@@ -83,21 +83,19 @@ public class HBObjectMapper {
         }
         for (Field field : clazz.getDeclaredFields()) {
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-            if (hbColumn.isSingleVersioned()) {
+            if (hbColumn.isPresent()) {
                 NavigableMap<byte[], NavigableMap<Long, byte[]>> familyMap = map.get(Bytes.toBytes(hbColumn.family()));
                 if (familyMap == null || familyMap.isEmpty())
                     continue;
                 NavigableMap<Long, byte[]> columnVersionsMap = familyMap.get(Bytes.toBytes(hbColumn.column()));
-                if (columnVersionsMap == null || columnVersionsMap.isEmpty())
-                    continue;
-                Map.Entry<Long, byte[]> lastEntry = columnVersionsMap.lastEntry();
-                objectSetFieldValue(obj, field, lastEntry.getValue(), hbColumn.codecFlags());
-            } else if (hbColumn.isMultiVersioned()) {
-                NavigableMap<byte[], NavigableMap<Long, byte[]>> familyMap = map.get(Bytes.toBytes(hbColumn.family()));
-                if (familyMap == null || familyMap.isEmpty())
-                    continue;
-                NavigableMap<Long, byte[]> columnVersionsMap = familyMap.get(Bytes.toBytes(hbColumn.column()));
-                objectSetFieldValue(obj, field, columnVersionsMap, hbColumn.codecFlags());
+                if (hbColumn.isSingleVersioned()) {
+                    if (columnVersionsMap == null || columnVersionsMap.isEmpty())
+                        continue;
+                    Map.Entry<Long, byte[]> lastEntry = columnVersionsMap.lastEntry();
+                    objectSetFieldValue(obj, field, lastEntry.getValue(), hbColumn.codecFlags());
+                } else {
+                    objectSetFieldValue(obj, field, columnVersionsMap, hbColumn.codecFlags());
+                }
             }
         }
         return obj;
@@ -158,14 +156,12 @@ public class HBObjectMapper {
                     numOfHBRowKeys++;
                 }
                 WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-                if (hbColumn.isSingleVersioned()) {
-                    validateHBColumnSingleVersionField(field);
-                    numOfHBColumns++;
-                    if (!columns.add(new Pair<>(hbColumn.family(), hbColumn.column()))) {
-                        throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumn.family(), hbColumn.column()));
+                if (hbColumn.isPresent()) {
+                    if (hbColumn.isMultiVersioned()) {
+                        validateHBColumnMultiVersionField(field);
+                    } else {
+                        validateHBColumnSingleVersionField(field);
                     }
-                } else if (hbColumn.isMultiVersioned()) {
-                    validateHBColumnMultiVersionField(field);
                     numOfHBColumns++;
                     if (!columns.add(new Pair<>(hbColumn.family(), hbColumn.column()))) {
                         throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumn.family(), hbColumn.column()));

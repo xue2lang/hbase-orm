@@ -1,6 +1,7 @@
 package com.flipkart.hbaseobjectmapper.entities;
 
 import com.flipkart.hbaseobjectmapper.*;
+import com.flipkart.hbaseobjectmapper.codec.BestSuitCodec;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
@@ -34,7 +35,7 @@ public class Citizen implements HBRecord<String> {
     private Long f3;
     @HBColumn(family = "optional", column = "f4")
     private BigDecimal f4;
-    @HBColumn(family = "optional", column = "pincode", codecFlags = {@Flag(name = "serializeAsString", value = "true")})
+    @HBColumn(family = "optional", column = "pincode", codecFlags = {@Flag(name = BestSuitCodec.SERIALIZE_AS_STRING, value = "true")})
     private Integer pincode;
     @HBColumnMultiVersion(family = "optional", column = "phone_number")
     private NavigableMap<Long, Integer> phoneNumberHistory;
