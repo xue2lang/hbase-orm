@@ -42,7 +42,7 @@ public class Citizen implements HBRecord<String> {
     @HBColumnMultiVersion(family = "tracked", column = "phone_number")
     private NavigableMap<Long, Integer> phoneNumber;
     
-    @HBColumn(family = "optional", column = "pincode", codecFlags = {@Flag(name = "serializeAsString", value = "true")})
+    @HBColumn(family = "optional", column = "pincode", codecFlags = {@Flag(name = BestSuitCodec.SERIALISE_AS_STRING, value = "true")})
     private Integer pincode;
     
     @Override
@@ -84,7 +84,8 @@ Now, this library enables you to represent rows of `citizens` HBase table as ins
  * serializes `null` as `null`
 * To control/modify serialization/deserialization behavior, you may define your own codec (by implementing the `Codec` interface) or extend default codec (by extending `BestSuitCodec` class).
 * The optional parameter `codecFlag` (supported by both `@HBColumn` and `@HBColumnMultiVersion` annotations) can be used to pass custom flags to the underlying codec.
-* The default codec takes a flag `serializeAsString` (like in the above example), which when set to `true`, serializes even numerical fields as a `String`. Your custom codec may take other such flags.
+* The default codec class `BestSuitCodec` takes a flag `BestSuitCodec.SERIALISE_AS_STRING`, whose value is "serializeAsString" (as in the above `Citizen` class example). When this flag is set to `true` on a field, the default codec serializes that field (even numerical fields) as `String`s.
+ * Your custom codec may take other such flags to customize serialization/deserialization behavior at a class field level.
 
 ## MapReduce use-cases
 

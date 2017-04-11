@@ -8,15 +8,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A wrapper class for {@link HBColumn} and {@link HBColumnMultiVersion} annotations (internal use only)
+ * A wrapper class for {@link HBColumn} and {@link HBColumnMultiVersion} annotations (for internal use only)
  */
-class WrappedHBColumn {
+public class WrappedHBColumn {
     private String family, column;
     private boolean multiVersioned = false, singleVersioned = false;
     private Class annotationClass;
     private Map<String, String> codecFlags;
 
-    WrappedHBColumn(Field field) {
+    public WrappedHBColumn(Field field) {
         HBColumn hbColumn = field.getAnnotation(HBColumn.class);
         HBColumnMultiVersion hbColumnMultiVersion = field.getAnnotation(HBColumnMultiVersion.class);
         if (hbColumn != null && hbColumnMultiVersion != null) {
