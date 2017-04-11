@@ -317,7 +317,7 @@ public class HBObjectMapper {
             NavigableMap<Long, byte[]> output = new TreeMap<>();
             for (NavigableMap.Entry<Long, R> e : fieldValueVersions.entrySet()) {
                 Long timestamp = e.getKey();
-                R fieldValue = (R) e.getValue();
+                R fieldValue = e.getValue();
                 if (fieldValue == null)
                     continue;
                 byte[] fieldValueBytes = valueToByteArray(fieldValue, codecFlags);
@@ -389,7 +389,7 @@ public class HBObjectMapper {
                 if (valuesVersioned == null)
                     continue;
                 for (Map.Entry<Long, byte[]> columnVersion : valuesVersioned.entrySet()) {
-                    cellList.add(new KeyValue(row, family, columnName, columnVersion.getKey(), columnVersion.getValue()));
+                    cellList.add(CellUtil.createCell(row, family, columnName, columnVersion.getKey(), KeyValue.Type.Put.getCode(), columnVersion.getValue()));
                 }
             }
         }

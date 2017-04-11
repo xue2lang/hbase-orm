@@ -9,6 +9,7 @@ import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.util.Bytes;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Array;
@@ -19,13 +20,13 @@ import java.util.*;
 /**
  * A <i>Data Access Object</i> class that enables simple random access (read/write) of HBase rows.
  * <p>
- * Please note: Unliked the {@link HBObjectMapper} class, this class is <b>not</b> thread-safe
+ * Please note: Unlike the {@link HBObjectMapper} class, this class is <b>not</b> thread-safe
  * </p>
  *
  * @param <R> Data type of row key (must be '{@link Comparable} with itself' and must be {@link Serializable})
  * @param <T> Entity type that maps to an HBase row (this type must have implemented {@link HBRecord} interface)
  */
-public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T extends HBRecord<R>> {
+public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T extends HBRecord<R>> implements Closeable {
 
     /**
      * Default number of versions to fetch
@@ -50,11 +51,13 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         }.getRawType();
         rowKeyClass = (Class<R>) new TypeToken<R>(getClass()) {
         }.getRawType();
-        if (hbRecordClass == null || rowKeyClass == null)
+        if (hbRecordClass == null || rowKeyClass == null) {
             throw new IllegalStateException(String.format("Unable to resolve HBase record/rowkey type (record class is resolving to %s and rowkey class is resolving to %s)", hbRecordClass, rowKeyClass));
+        }
         HBTable hbTable = hbRecordClass.getAnnotation(HBTable.class);
-        if (hbTable == null)
+        if (hbTable == null) {
             throw new IllegalStateException(String.format("Type %s should be annotated with %s for use in class %s", hbRecordClass.getName(), HBTable.class.getName(), AbstractHBDAO.class.getName()));
+        }
         this.hTable = new HTable(conf, hbTable.value());
         this.fields = hbObjectMapper.getHBFields(hbRecordClass);
     }
@@ -345,7 +348,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public NavigableMap<Long, Object> fetchFieldValue(R rowKey, String fieldName, int versions) throws IOException {
-        R[] array = (R[]) Array.newInstance(rowKeyClass, 1);
+        @SuppressWarnings("unchecked") R[] array = (R[]) Array.newInstance(rowKeyClass, 1);
         array[0] = rowKey;
         return fetchFieldValues(array, fieldName, versions).get(rowKey);
 
@@ -440,4 +443,8 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         return map;
     }
 
+    @Override
+    public void close() throws IOException {
+        hTable.close();
+    }
 }
