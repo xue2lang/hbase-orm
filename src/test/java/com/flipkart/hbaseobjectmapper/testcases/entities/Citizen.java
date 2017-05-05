@@ -12,7 +12,7 @@ import java.util.NavigableMap;
 @SuppressWarnings("unused")
 @ToString
 @EqualsAndHashCode
-@HBTable("citizens")
+@HBTable(name = "citizens", columnFamilies = {@Family(name = "", version = 4)})
 public class Citizen implements HBRecord<String> {
     private static final String KEY_DELIM = "#";
     @HBRowKey

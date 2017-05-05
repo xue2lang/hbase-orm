@@ -8,7 +8,7 @@ import com.flipkart.hbaseobjectmapper.HBTable;
 import lombok.ToString;
 
 @ToString
-@HBTable("citizens_summary")
+@HBTable(name = "citizens_summary")
 public class CitizenSummary implements HBRecord<String> {
 
     @HBRowKey

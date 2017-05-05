@@ -6,7 +6,7 @@ import com.flipkart.hbaseobjectmapper.HBRowKey;
 import com.flipkart.hbaseobjectmapper.HBTable;
 import lombok.ToString;
 
-@HBTable("crawls")
+@HBTable(name = "crawls")
 @ToString
 public class CrawlNoVersion implements HBRecord<String> {
     @HBRowKey

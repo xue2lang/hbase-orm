@@ -59,7 +59,7 @@ public class TestObjects {
             }, null, null)
     );
 
-    public static final List<HBRecord> validCitizenObjects = new ArrayList<HBRecord>() {
+    public static final List<Citizen> validCitizenObjects = new ArrayList<Citizen>() {
         {
             addAll(TestObjects.validCitizenObjectsNoVersion);
             addAll(TestObjects.validCitizenObjectsWithHBColumnMultiVersion);

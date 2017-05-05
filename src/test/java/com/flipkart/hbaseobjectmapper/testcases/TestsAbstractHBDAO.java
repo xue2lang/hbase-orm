@@ -45,8 +45,8 @@ public class TestsAbstractHBDAO {
 
     @Test
     public void testRegularCRUD() throws IOException {
-        hBaseCluster.createTable("citizens", a("main", "optional"), 1);
-        hBaseCluster.createTable("citizens_summary", a("a"), 1);
+        hBaseCluster.createTable("citizens", a("main", "optional"), 3);
+        hBaseCluster.createTable("citizens_summary", a("a"), 3);
         try (
                 CitizenDAO citizenDao = new CitizenDAO(configuration);
                 CitizenSummaryDAO citizenSummaryDAO = new CitizenSummaryDAO(configuration);
@@ -55,45 +55,45 @@ public class TestsAbstractHBDAO {
             assertEquals("Issue with column families of 'citizens' table\n" + citizenDao.getColumnFamilies(), s("main", "optional"), citizenDao.getColumnFamilies());
             assertEquals(citizenSummaryDAO.getTableName(), "citizens_summary");
             assertEquals("Issue with column families of 'citizens_summary' table\n" + citizenSummaryDAO.getColumnFamilies(), s("a"), citizenSummaryDAO.getColumnFamilies());
-            final List<Citizen> testObjs = TestObjects.validCitizenObjectsNoVersion;
+            final List<Citizen> testObjs = TestObjects.validCitizenObjects;
             String[] rowKeys = new String[testObjs.size()];
             Map<String, Map<String, Object>> expectedFieldValues = new HashMap<>();
             for (int i = 0; i < testObjs.size(); i++) {
-                HBRecord<String> e = testObjs.get(i);
+                HBRecord<String> object = testObjs.get(i);
                 try {
-                    final String rowKey = citizenDao.persist(e);
+                    final String rowKey = citizenDao.persist(object);
                     rowKeys[i] = rowKey;
-                    Citizen pe = citizenDao.get(rowKey);
-                    assertEquals("Entry got corrupted upon persisting and fetching back", e, pe);
+                    Citizen pObject = citizenDao.get(rowKey, Integer.MAX_VALUE);
+                    assertEquals("Entry got corrupted upon persisting and fetching back", object, pObject);
                     for (String f : citizenDao.getFields()) {
                         try {
                             Field field = Citizen.class.getDeclaredField(f);
                             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
                             field.setAccessible(true);
-                            final Object actual = citizenDao.fetchFieldValue(rowKey, f);
-                            Object expected = field.get(e);
                             if (hbColumn.isMultiVersioned()) {
-                                NavigableMap columnHistory = ((NavigableMap) field.get(e));
-                                if (columnHistory != null && columnHistory.size() > 0) {
-                                    expected = columnHistory.lastEntry().getValue();
+                                NavigableMap expected = ((NavigableMap) field.get(object));
+                                final NavigableMap<Long, Object> actual = citizenDao.fetchFieldValue(rowKey, f, Integer.MAX_VALUE);
+                                assertEquals("Data for field \"" + field + "\" got corrupted upon persisting and fetching back object: " + object, expected, actual);
+                            } else {
+                                final Object actual = citizenDao.fetchFieldValue(rowKey, f);
+                                Object expected = field.get(object);
+                                assertEquals("Field data corrupted upon persisting and fetching back", expected, actual);
+                                if (actual == null) continue;
+                                if (!expectedFieldValues.containsKey(f)) {
+                                    expectedFieldValues.put(f, new HashMap<String, Object>() {
+                                        {
+                                            put(rowKey, actual);
+                                        }
+                                    });
+                                } else {
+                                    expectedFieldValues.get(f).put(rowKey, actual);
                                 }
                             }
-                            assertEquals("Field data corrupted upon persisting and fetching back", expected, actual);
-                            if (actual == null) continue;
-                            if (!expectedFieldValues.containsKey(f)) {
-                                expectedFieldValues.put(f, new HashMap<String, Object>() {
-                                    {
-                                        put(rowKey, actual);
-                                    }
-                                });
-                            } else {
-                                expectedFieldValues.get(f).put(rowKey, actual);
-                            }
-                        } catch (IllegalAccessException e1) {
-                            e1.printStackTrace();
-                            fail("Can't get field " + f + " from object " + e);
-                        } catch (NoSuchFieldException e1) {
-                            e1.printStackTrace();
+                        } catch (IllegalAccessException e) {
+                            e.printStackTrace();
+                            fail("Can't get field " + f + " from object " + object);
+                        } catch (NoSuchFieldException e) {
+                            e.printStackTrace();
                             fail("Field missing: " + f);
                         } catch (IOException ioex) {
                             ioex.printStackTrace();
@@ -125,8 +125,8 @@ public class TestsAbstractHBDAO {
                 expectedSumOfSalaries += c.getSal() == null ? 0 : c.getSal();
             }
             assertEquals(expectedSumOfSalaries, actualSumOfSalaries);
-            Assert.assertArrayEquals("Data mismatch between single and bulk 'get' calls", testObjs.toArray(), citizenDao.get(rowKeys));
-            Assert.assertEquals("Data mismatch between List and array bulk variants of 'get' calls", testObjs, citizenDao.get(Arrays.asList(rowKeys)));
+            assertArrayEquals("Data mismatch between single and bulk 'get' calls", testObjs.toArray(), citizenDao.get(rowKeys));
+            assertEquals("Data mismatch between List and array bulk variants of 'get' calls", testObjs, citizenDao.get(Arrays.asList(rowKeys)));
             Citizen citizenToBeDeleted = testObjs.get(0);
             citizenDao.delete(citizenToBeDeleted);
             assertNull("Record was not deleted: " + citizenToBeDeleted, citizenDao.get(citizenToBeDeleted.composeRowKey()));

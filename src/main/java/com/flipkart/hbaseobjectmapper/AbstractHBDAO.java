@@ -58,7 +58,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         if (hbTable == null) {
             throw new IllegalStateException(String.format("Type %s should be annotated with %s for use in class %s", hbRecordClass.getName(), HBTable.class.getName(), AbstractHBDAO.class.getName()));
         }
-        this.hTable = new HTable(conf, hbTable.value());
+        this.hTable = new HTable(conf, hbTable.name());
         this.fields = hbObjectMapper.getHBFields(hbRecordClass);
     }
 
@@ -270,7 +270,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      */
     public String getTableName() {
         HBTable hbTable = hbRecordClass.getAnnotation(HBTable.class);
-        return hbTable.value();
+        return hbTable.name();
     }
 
     /**

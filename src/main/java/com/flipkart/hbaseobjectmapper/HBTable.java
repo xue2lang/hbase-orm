@@ -11,5 +11,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface HBTable {
-    String value();
+    String name();
+
+    Family[] columnFamilies() default {};
 }

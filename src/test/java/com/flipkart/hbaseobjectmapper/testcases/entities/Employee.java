@@ -10,7 +10,7 @@ import lombok.ToString;
 @SuppressWarnings("unused")
 @ToString
 @EqualsAndHashCode
-@HBTable("employees")
+@HBTable(name = "employees")
 public class Employee implements HBRecord<Long> {
     @HBRowKey
     private Long empid;

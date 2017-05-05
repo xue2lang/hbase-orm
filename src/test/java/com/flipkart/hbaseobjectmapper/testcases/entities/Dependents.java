@@ -11,15 +11,15 @@ import java.util.List;
 @EqualsAndHashCode
 public class Dependents implements Serializable {
     @JsonProperty
-    private Integer uidWife;
+    private Integer uidSpouse;
     @JsonProperty
     private List<Integer> uidChildren;
 
     public Dependents() {
     }
 
-    public Dependents(Integer uidWife, List<Integer> uidChildren) {
-        this.uidWife = uidWife;
+    public Dependents(Integer uidSpouse, List<Integer> uidChildren) {
+        this.uidSpouse = uidSpouse;
         this.uidChildren = uidChildren;
     }
 }
