@@ -59,7 +59,7 @@ public class HBObjectMapper {
     }
 
     @SuppressWarnings("unchecked")
-    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Class<T> entityClass) throws DeserializationException {
+    <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Class<T> entityClass) throws DeserializationException {
         try {
             return (R) byteArrayToValue(rowKeyBytes, entityClass.getDeclaredMethod("composeRowKey").getReturnType(), null);
         } catch (NoSuchMethodException e) {
@@ -447,7 +447,7 @@ public class HBObjectMapper {
         return readValueFromResult(result, clazz);
     }
 
-    <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Result result, Class<T> clazz) throws DeserializationException {
+    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Result result, Class<T> clazz) throws DeserializationException {
         if (rowKey == null)
             return readValueFromResult(result, clazz);
         else
@@ -536,11 +536,11 @@ public class HBObjectMapper {
      * @return Bean-like object
      * @throws DeserializationException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
-    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(String rowKey, Put put, Class<T> clazz) throws DeserializationException {
+    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Put put, Class<T> clazz) throws DeserializationException {
         if (rowKey == null)
             return readValueFromPut(put, clazz);
         else
-            return readValueFromRowAndPut(Bytes.toBytes(rowKey), put, clazz);
+            return readValueFromRowAndPut(rowKeyToBytes(rowKey), put, clazz);
     }
 
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValueFromRowAndPut(byte[] rowKey, Put put, Class<T> clazz) throws DeserializationException {

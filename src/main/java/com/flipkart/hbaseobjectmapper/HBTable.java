@@ -11,7 +11,18 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface HBTable {
+    /**
+     * Name of the HBase table
+     *
+     * @return Name of the HBase table
+     */
     String name();
 
+
+    /**
+     * Column families and their specs
+     *
+     * @return Column families and their specs
+     */
     Family[] columnFamilies() default {};
 }

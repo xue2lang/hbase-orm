@@ -309,14 +309,14 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         return field;
     }
 
-    private static void populateFieldValuesToMap(Field field, Result result, Map<String, NavigableMap<Long, Object>> map) throws DeserializationException {
+    private void populateFieldValuesToMap(Field field, Result result, Map<R, NavigableMap<Long, Object>> map) throws DeserializationException {
         if (result.isEmpty())
             return;
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         List<Cell> cells = result.getColumnCells(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         for (Cell cell : cells) {
             Type fieldType = hbObjectMapper.getFieldType(field, hbColumn.isMultiVersioned());
-            final String rowKey = Bytes.toString(CellUtil.cloneRow(cell));
+            final R rowKey = hbObjectMapper.bytesToRowKey(CellUtil.cloneRow(cell), (Class<T>) field.getDeclaringClass());
             if (!map.containsKey(rowKey))
                 map.put(rowKey, new TreeMap<Long, Object>());
             map.get(rowKey).put(cell.getTimestamp(), hbObjectMapper.byteArrayToValue(CellUtil.cloneValue(cell), fieldType, hbColumn.codecFlags()));
@@ -363,14 +363,14 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @return Map of row key and column value
      * @throws IOException When HBase call fails
      */
-    public Map<String, Object> fetchFieldValues(R startRowKey, R endRowKey, String fieldName) throws IOException {
-        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, 1);
+    public Map<R, Object> fetchFieldValues(R startRowKey, R endRowKey, String fieldName) throws IOException {
+        final Map<R, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, 1);
         return toSingleVersioned(multiVersionedMap, 10);
     }
 
-    private static Map<String, Object> toSingleVersioned(Map<String, NavigableMap<Long, Object>> multiVersionedMap, int mapInitialCapacity) {
-        Map<String, Object> map = new HashMap<>(mapInitialCapacity);
-        for (Map.Entry<String, NavigableMap<Long, Object>> e : multiVersionedMap.entrySet()) {
+    private Map<R, Object> toSingleVersioned(Map<R, NavigableMap<Long, Object>> multiVersionedMap, int mapInitialCapacity) {
+        Map<R, Object> map = new HashMap<>(mapInitialCapacity);
+        for (Map.Entry<R, NavigableMap<Long, Object>> e : multiVersionedMap.entrySet()) {
             map.put(e.getKey(), e.getValue().lastEntry().getValue());
         }
         return map;
@@ -386,14 +386,14 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @return Map of row key and column values (versioned)
      * @throws IOException When HBase call fails
      */
-    public NavigableMap<String, NavigableMap<Long, Object>> fetchFieldValues(R startRowKey, R endRowKey, String fieldName, int versions) throws IOException {
+    public NavigableMap<R, NavigableMap<Long, Object>> fetchFieldValues(R startRowKey, R endRowKey, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         Scan scan = new Scan(hbObjectMapper.rowKeyToBytes(startRowKey), hbObjectMapper.rowKeyToBytes(endRowKey));
         scan.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         scan.setMaxVersions(versions);
         ResultScanner scanner = hTable.getScanner(scan);
-        NavigableMap<String, NavigableMap<Long, Object>> map = new TreeMap<>();
+        NavigableMap<R, NavigableMap<Long, Object>> map = new TreeMap<>();
         for (Result result : scanner) {
             populateFieldValuesToMap(field, result, map);
         }
@@ -408,8 +408,8 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @return Map of row key and column values
      * @throws IOException Exception from HBase
      */
-    public Map<String, Object> fetchFieldValues(R[] rowKeys, String fieldName) throws IOException {
-        final Map<String, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, 1);
+    public Map<R, Object> fetchFieldValues(R[] rowKeys, String fieldName) throws IOException {
+        final Map<R, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, 1);
         return toSingleVersioned(multiVersionedMap, rowKeys.length);
     }
 
@@ -422,7 +422,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @return Map of row key and column values (versioned)
      * @throws IOException When HBase call fails
      */
-    public Map<String, NavigableMap<Long, Object>> fetchFieldValues(R[] rowKeys, String fieldName, int versions) throws IOException {
+    public Map<R, NavigableMap<Long, Object>> fetchFieldValues(R[] rowKeys, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         if (!hbColumn.isPresent()) {
@@ -436,7 +436,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
             gets.add(get);
         }
         Result[] results = this.hTable.get(gets);
-        Map<String, NavigableMap<Long, Object>> map = new HashMap<>(rowKeys.length);
+        Map<R, NavigableMap<Long, Object>> map = new HashMap<>(rowKeys.length);
         for (Result result : results) {
             populateFieldValuesToMap(field, result, map);
         }

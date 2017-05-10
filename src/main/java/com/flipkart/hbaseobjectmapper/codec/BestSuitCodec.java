@@ -154,10 +154,12 @@ public class BestSuitCodec implements Codec {
                 throw new DeserializationException("Could not deserialize byte array into an object using HBase's native methods", e);
             }
         } else {
+            JavaType javaType = null;
             try {
-                return objectMapper.readValue(bytes, objectMapper.constructType(type));
+                javaType = objectMapper.constructType(type);
+                return objectMapper.readValue(bytes, javaType);
             } catch (Exception e) {
-                throw new DeserializationException("Could not deserialize JSON into an object using Jackson", e);
+                throw new DeserializationException(String.format("Could not deserialize JSON into an object of type %s using Jackson\n(Jackson resolved type = %s)", type, javaType), e);
             }
         }
 
