@@ -1,10 +1,9 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
+import com.flipkart.hbaseobjectmapper.*;
 
 @SuppressWarnings("unused")
+@HBTable(name = "blah", families = {@Family(name = "main")})
 public class UninstantiatableClass implements HBRecord<String> {
     @HBRowKey
     private Integer uid;

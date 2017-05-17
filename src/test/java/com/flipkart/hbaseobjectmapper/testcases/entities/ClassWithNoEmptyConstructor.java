@@ -1,10 +1,9 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
+import com.flipkart.hbaseobjectmapper.*;
 
 @SuppressWarnings({"FieldCanBeLocal", "CanBeFinal", "unused"})
+@HBTable(name = "blah", families = {@Family(name = "a")})
 public class ClassWithNoEmptyConstructor implements HBRecord<String> {
     @HBRowKey
     protected String key = "key";

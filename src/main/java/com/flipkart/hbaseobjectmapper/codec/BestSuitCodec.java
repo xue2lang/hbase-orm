@@ -25,7 +25,7 @@ import java.util.Map;
  * <p>
  * This codec takes the following {@link Flag Flag}s:
  * <ul>
- * <li><b><code>serializeAsString</code></b>: When passed, it indicates this codec to store field value in it's string representation (e.g. <b>560034</b> is serialized into a <code>byte[]</code> that represents the string <b>"560034"</b>). Note that, this flag applies only to fields of data types in point 1 above.</li>
+ * <li><b><code>{@link #SERIALISE_AS_STRING}</code></b>: When passed, it indicates this codec to store field value in it's string representation (e.g. <b>560034</b> is serialized into a <code>byte[]</code> that represents the string <b>"560034"</b>). Note that, this flag applies only to fields of data types in point 1 above.</li>
  * </ul>
  */
 
@@ -164,7 +164,6 @@ public class BestSuitCodec implements Codec {
         }
 
     }
-
 
     /*
     * @inherit

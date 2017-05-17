@@ -36,6 +36,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     protected final HTable hTable;
     protected final Class<R> rowKeyClass;
     protected final Class<T> hbRecordClass;
+    protected final WrappedHBTable<R, T> hbTable;
     private final Map<String, Field> fields;
 
     /**
@@ -54,12 +55,9 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         if (hbRecordClass == null || rowKeyClass == null) {
             throw new IllegalStateException(String.format("Unable to resolve HBase record/rowkey type (record class is resolving to %s and rowkey class is resolving to %s)", hbRecordClass, rowKeyClass));
         }
-        HBTable hbTable = hbRecordClass.getAnnotation(HBTable.class);
-        if (hbTable == null) {
-            throw new IllegalStateException(String.format("Type %s should be annotated with %s for use in class %s", hbRecordClass.getName(), HBTable.class.getName(), AbstractHBDAO.class.getName()));
-        }
-        this.hTable = new HTable(conf, hbTable.name());
-        this.fields = hbObjectMapper.getHBFields(hbRecordClass);
+        hbTable = new WrappedHBTable<>(hbRecordClass);
+        hTable = new HTable(conf, hbTable.getName());
+        fields = hbObjectMapper.getHBFields(hbRecordClass);
     }
 
     /**
@@ -310,15 +308,17 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     }
 
     private void populateFieldValuesToMap(Field field, Result result, Map<R, NavigableMap<Long, Object>> map) throws DeserializationException {
-        if (result.isEmpty())
+        if (result.isEmpty()) {
             return;
+        }
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         List<Cell> cells = result.getColumnCells(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         for (Cell cell : cells) {
             Type fieldType = hbObjectMapper.getFieldType(field, hbColumn.isMultiVersioned());
             final R rowKey = hbObjectMapper.bytesToRowKey(CellUtil.cloneRow(cell), (Class<T>) field.getDeclaringClass());
-            if (!map.containsKey(rowKey))
+            if (!map.containsKey(rowKey)) {
                 map.put(rowKey, new TreeMap<Long, Object>());
+            }
             map.get(rowKey).put(cell.getTimestamp(), hbObjectMapper.byteArrayToValue(CellUtil.cloneValue(cell), fieldType, hbColumn.codecFlags()));
         }
     }
@@ -332,7 +332,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public Object fetchFieldValue(R rowKey, String fieldName) throws IOException {
-        final NavigableMap<Long, Object> fieldValues = fetchFieldValue(rowKey, fieldName, 1);
+        final NavigableMap<Long, Object> fieldValues = fetchFieldValue(rowKey, fieldName, DEFAULT_NUM_VERSIONS);
         if (fieldValues == null || fieldValues.isEmpty()) return null;
         else return fieldValues.lastEntry().getValue();
     }
@@ -341,14 +341,14 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     /**
      * Fetch multiple versions of column values by row key and field name
      *
-     * @param rowKey    Row key to reference HBase row
-     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
-     * @param versions  Number of versions of column to fetch
+     * @param rowKey      Row key to reference HBase row
+     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
+     * @param versions Number of versions of column to fetch
      * @return {@link NavigableMap} of timestamps and values of the column (boxed), <code>null</code> if row with given rowKey doesn't exist or such field doesn't exist for the row
      * @throws IOException When HBase call fails
      */
     public NavigableMap<Long, Object> fetchFieldValue(R rowKey, String fieldName, int versions) throws IOException {
-        @SuppressWarnings("unchecked") R[] array = (R[]) Array.newInstance(rowKeyClass, 1);
+        @SuppressWarnings("unchecked") R[] array = (R[]) Array.newInstance(rowKeyClass, DEFAULT_NUM_VERSIONS);
         array[0] = rowKey;
         return fetchFieldValues(array, fieldName, versions).get(rowKey);
 
@@ -364,12 +364,12 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public Map<R, Object> fetchFieldValues(R startRowKey, R endRowKey, String fieldName) throws IOException {
-        final Map<R, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, 1);
+        final Map<R, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(startRowKey, endRowKey, fieldName, DEFAULT_NUM_VERSIONS);
         return toSingleVersioned(multiVersionedMap, 10);
     }
 
     private Map<R, Object> toSingleVersioned(Map<R, NavigableMap<Long, Object>> multiVersionedMap, int mapInitialCapacity) {
-        Map<R, Object> map = new HashMap<>(mapInitialCapacity);
+        Map<R, Object> map = new HashMap<>(mapInitialCapacity, 1.0f);
         for (Map.Entry<R, NavigableMap<Long, Object>> e : multiVersionedMap.entrySet()) {
             map.put(e.getKey(), e.getValue().lastEntry().getValue());
         }
@@ -389,6 +389,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public NavigableMap<R, NavigableMap<Long, Object>> fetchFieldValues(R startRowKey, R endRowKey, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+        validateFetchInput(field, versions, hbColumn);
         Scan scan = new Scan(hbObjectMapper.rowKeyToBytes(startRowKey), hbObjectMapper.rowKeyToBytes(endRowKey));
         scan.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         scan.setMaxVersions(versions);
@@ -409,7 +410,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException Exception from HBase
      */
     public Map<R, Object> fetchFieldValues(R[] rowKeys, String fieldName) throws IOException {
-        final Map<R, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, 1);
+        final Map<R, NavigableMap<Long, Object>> multiVersionedMap = fetchFieldValues(rowKeys, fieldName, DEFAULT_NUM_VERSIONS);
         return toSingleVersioned(multiVersionedMap, rowKeys.length);
     }
 
@@ -425,9 +426,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public Map<R, NavigableMap<Long, Object>> fetchFieldValues(R[] rowKeys, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-        if (!hbColumn.isPresent()) {
-            throw new FieldNotMappedToHBaseColumnException(hbRecordClass, fieldName);
-        }
+        validateFetchInput(field, versions, hbColumn);
         List<Get> gets = new ArrayList<>(rowKeys.length);
         for (R rowKey : rowKeys) {
             Get get = new Get(hbObjectMapper.rowKeyToBytes(rowKey));
@@ -441,6 +440,18 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
             populateFieldValuesToMap(field, result, map);
         }
         return map;
+    }
+
+    private void validateFetchInput(Field field, int versions, WrappedHBColumn hbColumn) {
+        if (!hbColumn.isPresent()) {
+            throw new FieldNotMappedToHBaseColumnException(hbRecordClass, field.getName());
+        }
+        if (versions > hbTable.getNumVersions(hbColumn.family())) {
+            throw new IllegalArgumentException(
+                    String.format("You attempted to fetch %d versions of field %s (mapped to HBase column %s) - But column family %s is configured to use max %d versions only",
+                            versions, field.getName(), hbColumn, hbColumn.family(), hbTable.getNumVersions(hbColumn.family())
+                    ));
+        }
     }
 
     @Override

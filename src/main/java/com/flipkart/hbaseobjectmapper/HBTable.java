@@ -24,5 +24,5 @@ public @interface HBTable {
      *
      * @return Column families and their specs
      */
-    Family[] columnFamilies() default {};
+    Family[] families() default {};
 }

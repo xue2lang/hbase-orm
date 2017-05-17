@@ -1,14 +1,13 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
-import com.flipkart.hbaseobjectmapper.HBColumnMultiVersion;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
+import com.flipkart.hbaseobjectmapper.*;
 
 import java.util.Map;
 import java.util.NavigableMap;
 
 public class ClassesWithFieldIncompatibleWithHBColumnMultiVersion {
     @SuppressWarnings("unused")
+    @HBTable(name = "blah", families = {@Family(name = "f")})
     public static class NotMap implements HBRecord<String> {
         @HBRowKey
         protected String key = "key";
@@ -28,6 +27,7 @@ public class ClassesWithFieldIncompatibleWithHBColumnMultiVersion {
     }
 
     @SuppressWarnings("unused")
+    @HBTable(name = "blah", families = {@Family(name = "f")})
     public static class NotNavigableMap implements HBRecord<String> {
         @HBRowKey
         protected String key = "key";
@@ -47,6 +47,7 @@ public class ClassesWithFieldIncompatibleWithHBColumnMultiVersion {
     }
 
     @SuppressWarnings("unused")
+    @HBTable(name = "blah", families = {@Family(name = "f")})
     public static class EntryKeyNotLong implements HBRecord<String> {
         @HBRowKey
         protected String key = "key";

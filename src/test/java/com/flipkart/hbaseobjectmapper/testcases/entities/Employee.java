@@ -1,16 +1,13 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
-import com.flipkart.hbaseobjectmapper.HBTable;
+import com.flipkart.hbaseobjectmapper.*;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 @SuppressWarnings("unused")
 @ToString
 @EqualsAndHashCode
-@HBTable(name = "employees")
+@HBTable(name = "employees", families = {@Family(name = "a")})
 public class Employee implements HBRecord<Long> {
     @HBRowKey
     private Long empid;

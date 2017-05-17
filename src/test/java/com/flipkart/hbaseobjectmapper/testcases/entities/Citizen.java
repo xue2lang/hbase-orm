@@ -2,7 +2,6 @@ package com.flipkart.hbaseobjectmapper.testcases.entities;
 
 import com.flipkart.hbaseobjectmapper.*;
 import com.flipkart.hbaseobjectmapper.codec.BestSuitCodec;
-import com.flipkart.hbaseobjectmapper.entities.Contact;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
@@ -15,7 +14,7 @@ import java.util.NavigableMap;
 @SuppressWarnings("unused")
 @ToString
 @EqualsAndHashCode
-@HBTable(name = "citizens", columnFamilies = {@Family(name = "main", numVersions = 4), @Family(name = "optional", numVersions = 4)})
+@HBTable(name = "citizens", families = {@Family(name = "main", versions = 1), @Family(name = "optional", versions = 4)})
 public class Citizen implements HBRecord<String> {
     private static final String KEY_DELIM = "#";
     @HBRowKey

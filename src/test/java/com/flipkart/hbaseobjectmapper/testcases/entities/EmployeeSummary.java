@@ -1,14 +1,11 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
-import com.flipkart.hbaseobjectmapper.HBTable;
+import com.flipkart.hbaseobjectmapper.*;
 import lombok.ToString;
 
 @ToString
-@HBTable(name = "employees_summary")
+@HBTable(name = "employees_summary", families = {@Family(name = "a")})
 public class EmployeeSummary implements HBRecord<String> {
 
     @HBRowKey

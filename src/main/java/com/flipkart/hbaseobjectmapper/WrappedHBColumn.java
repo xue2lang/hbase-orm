@@ -10,13 +10,13 @@ import java.util.Map;
 /**
  * A wrapper class for {@link HBColumn} and {@link HBColumnMultiVersion} annotations (for internal use only)
  */
-public class WrappedHBColumn {
+class WrappedHBColumn {
     private String family, column;
     private boolean multiVersioned = false, singleVersioned = false;
     private Class annotationClass;
     private Map<String, String> codecFlags;
 
-    public WrappedHBColumn(Field field) {
+    WrappedHBColumn(Field field) {
         HBColumn hbColumn = field.getAnnotation(HBColumn.class);
         HBColumnMultiVersion hbColumnMultiVersion = field.getAnnotation(HBColumnMultiVersion.class);
         if (hbColumn != null && hbColumnMultiVersion != null) {
@@ -71,5 +71,10 @@ public class WrappedHBColumn {
 
     public String getName() {
         return annotationClass.getName();
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s:%s", family, column);
     }
 }

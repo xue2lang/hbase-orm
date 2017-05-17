@@ -1,12 +1,9 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
-import com.flipkart.hbaseobjectmapper.HBTable;
+import com.flipkart.hbaseobjectmapper.*;
 import lombok.ToString;
 
-@HBTable(name = "crawls")
+@HBTable(name = "crawls", families = {@Family(name = "a")})
 @ToString
 public class CrawlNoVersion implements HBRecord<String> {
     @HBRowKey

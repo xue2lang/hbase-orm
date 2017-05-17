@@ -55,7 +55,7 @@ public class HBObjectMapper {
      * @return Byte array
      */
     <R extends Serializable & Comparable<R>> byte[] rowKeyToBytes(R rowKey) {
-        return valueToByteArray(rowKey, null);
+        return valueToByteArray(rowKey);
     }
 
     @SuppressWarnings("unchecked")
@@ -117,10 +117,9 @@ public class HBObjectMapper {
      *
      * @param value      Object to be serialized
      * @param codecFlags Flags to be passed to Codec
-     * @param <R>        Data type of row key
      * @return Byte-array representing serialized object
      */
-    public <R extends Serializable & Comparable<R>> byte[] valueToByteArray(R value, Map<String, String> codecFlags) {
+    public byte[] valueToByteArray(Serializable value, Map<String, String> codecFlags) {
         try {
             try {
                 return codec.serialize(value, codecFlags);
@@ -133,7 +132,7 @@ public class HBObjectMapper {
         }
     }
 
-    public <R extends Serializable & Comparable<R>> byte[] valueToByteArray(R value) {
+    public byte[] valueToByteArray(Serializable value) {
         return valueToByteArray(value, null);
     }
 
@@ -152,26 +151,29 @@ public class HBObjectMapper {
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> void validateHBClass(Class<T> clazz) {
         Constructor constructor;
         try {
-            Set<Pair<String, String>> columns = new HashSet<>();
             constructor = clazz.getDeclaredConstructor();
             int numOfHBColumns = 0, numOfHBRowKeys = 0;
+            WrappedHBTable<R, T> hbTable = new WrappedHBTable<>(clazz);
+            Set<Pair<String, String>> columns = new HashSet<>(clazz.getDeclaredFields().length, 1.0f);
             for (Field field : clazz.getDeclaredFields()) {
                 if (field.isAnnotationPresent(HBRowKey.class)) {
                     numOfHBRowKeys++;
                 }
                 WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-                if (hbColumn.isSingleVersioned()) {
-                    validateHBColumnSingleVersionField(field);
-                    numOfHBColumns++;
-                    if (!columns.add(new Pair<>(hbColumn.family(), hbColumn.column()))) {
-                        throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumn.family(), hbColumn.column()));
+                if (hbColumn.isPresent()) {
+                    if (!hbTable.isColumnFamilyPresent(hbColumn.family())) {
+                        throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to same HBase column %s - but column family %s isn't configured in %s annotation",
+                                clazz.getName(), field.getName(), hbColumn, hbColumn.family(), HBTable.class.getSimpleName()));
                     }
-                } else if (hbColumn.isMultiVersioned()) {
-                    validateHBColumnMultiVersionField(field);
-                    numOfHBColumns++;
-                    if (!columns.add(new Pair<>(hbColumn.family(), hbColumn.column()))) {
-                        throw new FieldsMappedToSameColumnException(String.format("Class %s has two fields mapped to same column %s:%s", clazz.getName(), hbColumn.family(), hbColumn.column()));
+                    if (hbColumn.isSingleVersioned()) {
+                        validateHBColumnSingleVersionField(field);
+                    } else if (hbColumn.isMultiVersioned()) {
+                        validateHBColumnMultiVersionField(field);
                     }
+                    if (!columns.add(new Pair<>(hbColumn.family(), hbColumn.column()))) {
+                        throw new FieldsMappedToSameColumnException(String.format("Class %s has more than one field (e.g. '%s') mapped to same HBase column %s", clazz.getName(), field.getName(), hbColumn));
+                    }
+                    numOfHBColumns++;
                 }
             }
             if (numOfHBColumns == 0) {
@@ -613,7 +615,7 @@ public class HBObjectMapper {
         if (rowKey == null || rowKey.toString().isEmpty()) {
             throw new RowKeyCantBeEmptyException();
         }
-        return valueToByteArray(rowKey, null);
+        return valueToByteArray(rowKey);
     }
 
     /**
@@ -664,8 +666,9 @@ public class HBObjectMapper {
         validateHBClass(clazz);
         Map<String, Field> mappings = new HashMap<>();
         for (Field field : clazz.getDeclaredFields()) {
-            if (new WrappedHBColumn(field).isPresent())
+            if (new WrappedHBColumn(field).isPresent()) {
                 mappings.put(field.getName(), field);
+            }
         }
         return mappings;
     }

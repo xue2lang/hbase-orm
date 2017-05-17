@@ -2,11 +2,11 @@ package com.flipkart.hbaseobjectmapper.testcases;
 
 import com.flipkart.hbaseobjectmapper.HBColumnMultiVersion;
 import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.entities.Contact;
 import com.flipkart.hbaseobjectmapper.exceptions.AllHBColumnFieldsNullException;
 import com.flipkart.hbaseobjectmapper.exceptions.FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty;
 import com.flipkart.hbaseobjectmapper.exceptions.HBRowKeyFieldCantBeNullException;
 import com.flipkart.hbaseobjectmapper.testcases.entities.Citizen;
+import com.flipkart.hbaseobjectmapper.testcases.entities.Contact;
 import com.flipkart.hbaseobjectmapper.testcases.entities.Dependents;
 import com.flipkart.hbaseobjectmapper.testcases.entities.Employee;
 import org.javatuples.Triplet;

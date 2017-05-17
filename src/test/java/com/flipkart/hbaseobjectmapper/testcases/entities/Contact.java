@@ -1,4 +1,4 @@
-package com.flipkart.hbaseobjectmapper.entities;
+package com.flipkart.hbaseobjectmapper.testcases.entities;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;

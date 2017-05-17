@@ -1,10 +1,9 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
+import com.flipkart.hbaseobjectmapper.*;
 
 @SuppressWarnings({"FieldCanBeLocal", "unused"})
+@HBTable(name = "blah", families = {@Family(name = "a")})
 public class ClassWithBadAnnotationTransient implements HBRecord<String> {
     @HBRowKey
     protected String key = "key";

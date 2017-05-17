@@ -1,7 +1,7 @@
 package com.flipkart.hbaseobjectmapper.testcases;
 
 import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.WrappedHBColumn;
+import com.flipkart.hbaseobjectmapper.WrappedHBColumnTC;
 import com.flipkart.hbaseobjectmapper.testcases.daos.*;
 import com.flipkart.hbaseobjectmapper.testcases.entities.Citizen;
 import com.flipkart.hbaseobjectmapper.testcases.entities.Crawl;
@@ -20,8 +20,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.*;
 
-import static com.flipkart.hbaseobjectmapper.testcases.util.LiteralsUtil.a;
-import static com.flipkart.hbaseobjectmapper.testcases.util.LiteralsUtil.s;
+import static com.flipkart.hbaseobjectmapper.testcases.util.LiteralsUtil.*;
 import static org.junit.Assert.*;
 
 public class TestsAbstractHBDAO {
@@ -58,46 +57,42 @@ public class TestsAbstractHBDAO {
             final List<Citizen> testObjs = TestObjects.validCitizenObjects;
             String[] rowKeys = new String[testObjs.size()];
             Map<String, Map<String, Object>> expectedFieldValues = new HashMap<>();
-            for (int i = 0; i < testObjs.size(); i++) {
+            for (int i = 0; i < testObjs.size(); i++) { // for each test object,
                 HBRecord<String> object = testObjs.get(i);
                 try {
                     final String rowKey = citizenDao.persist(object);
                     rowKeys[i] = rowKey;
                     Citizen pObject = citizenDao.get(rowKey, Integer.MAX_VALUE);
                     assertEquals("Entry got corrupted upon persisting and fetching back", object, pObject);
-                    for (String f : citizenDao.getFields()) {
+                    for (String f : citizenDao.getFields()) { // for each field of the given test object,
                         try {
                             Field field = Citizen.class.getDeclaredField(f);
-                            WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+                            WrappedHBColumnTC hbColumn = new WrappedHBColumnTC(field);
                             field.setAccessible(true);
                             if (hbColumn.isMultiVersioned()) {
                                 NavigableMap expected = ((NavigableMap) field.get(object));
                                 final NavigableMap<Long, Object> actual = citizenDao.fetchFieldValue(rowKey, f, Integer.MAX_VALUE);
-                                assertEquals("Data for field \"" + field + "\" got corrupted upon persisting and fetching back object: " + object, expected, actual);
+                                assertEquals(String.format("Data for (multi-versioned) field\"%s\" got corrupted upon persisting and fetching back object: %s", field, object), expected, actual);
                             } else {
                                 final Object actual = citizenDao.fetchFieldValue(rowKey, f);
                                 Object expected = field.get(object);
-                                assertEquals("Field data corrupted upon persisting and fetching back", expected, actual);
+                                assertEquals(String.format("Data for field \"%s\" got corrupted upon persisting and fetching back object: %s", field, object), expected, actual);
                                 if (actual == null) continue;
                                 if (!expectedFieldValues.containsKey(f)) {
-                                    expectedFieldValues.put(f, new HashMap<String, Object>() {
-                                        {
-                                            put(rowKey, actual);
-                                        }
-                                    });
+                                    expectedFieldValues.put(f, m(e(rowKey, actual)));
                                 } else {
                                     expectedFieldValues.get(f).put(rowKey, actual);
                                 }
                             }
                         } catch (IllegalAccessException e) {
                             e.printStackTrace();
-                            fail("Can't get field " + f + " from object " + object);
+                            fail(String.format("Can't read field '%s' from object %s", f, object));
                         } catch (NoSuchFieldException e) {
                             e.printStackTrace();
-                            fail("Field missing: " + f);
+                            fail(String.format("Field missing: %s", f));
                         } catch (IOException ioex) {
                             ioex.printStackTrace();
-                            fail("Could not fetch field '" + f + "' for row '" + rowKey + "'");
+                            fail(String.format("Could not fetch field '%s' for row '%s'", f, rowKey));
                         }
                     }
                 } catch (IOException ioex) {
@@ -105,14 +100,15 @@ public class TestsAbstractHBDAO {
                     fail();
                 }
             }
-            List<Citizen> citizens = citizenDao.get(rowKeys[0], rowKeys[rowKeys.length - 1]);
+            final String startRowKey = rowKeys[0], endRowKey = rowKeys[rowKeys.length - 1];
+            List<Citizen> citizens = citizenDao.get(startRowKey, endRowKey, Integer.MAX_VALUE);
             for (int i = 0; i < citizens.size(); i++) {
-                assertEquals("When retrieved in bulk (range scan), we have unexpected entry", citizens.get(i), testObjs.get(i));
+                assertEquals(String.format("[range scan] The result of get(%s, %s) returned unexpected entry at position " + i, startRowKey, endRowKey), testObjs.get(i), citizens.get(i));
             }
             for (String f : citizenDao.getFields()) {
                 Map<String, Object> actualFieldValues = citizenDao.fetchFieldValues(rowKeys, f);
                 Map<String, Object> actualFieldValuesScanned = citizenDao.fetchFieldValues("A", "z", f);
-                assertEquals(String.format("Invalid data returned when values for column \"%s\" were fetched in bulk\nExpected: %s\nActual: %s", f, expectedFieldValues.get(f), actualFieldValues), expectedFieldValues.get(f), actualFieldValues);
+                assertEquals(String.format("Invalid data returned when values for column \"%s\" were fetched in bulk", f), expectedFieldValues.get(f), actualFieldValues);
                 assertEquals("Difference between 'bulk fetch by array of row keys' and 'bulk fetch by range of row keys'", actualFieldValues, actualFieldValuesScanned);
             }
             Map<String, Object> actualSalaries = citizenDao.fetchFieldValues(rowKeys, "sal");
