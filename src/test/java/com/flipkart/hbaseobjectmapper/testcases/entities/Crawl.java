@@ -6,7 +6,7 @@ import lombok.ToString;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
-@HBTable(name = "crawls", families = {@Family(name = "a")})
+@HBTable(name = "crawls", families = {@Family(name = "a", versions = 10)})
 @ToString
 public class Crawl implements HBRecord<String> {
     @HBRowKey

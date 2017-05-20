@@ -121,14 +121,11 @@ public class HBObjectMapper {
      */
     public byte[] valueToByteArray(Serializable value, Map<String, String> codecFlags) {
         try {
-            try {
-                return codec.serialize(value, codecFlags);
-            } catch (SerializationException jpx) {
-                throw new ConversionFailedException("Don't know how to convert field to byte array", jpx);
-            }
-
+            return codec.serialize(value, codecFlags);
         } catch (IllegalArgumentException e) {
             throw new BadHBaseLibStateException(e);
+        } catch (SerializationException jpx) {
+            throw new ConversionFailedException("Don't know how to convert field to byte array", jpx);
         }
     }
 
@@ -162,7 +159,7 @@ public class HBObjectMapper {
                 WrappedHBColumn hbColumn = new WrappedHBColumn(field);
                 if (hbColumn.isPresent()) {
                     if (!hbTable.isColumnFamilyPresent(hbColumn.family())) {
-                        throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to same HBase column %s - but column family %s isn't configured in %s annotation",
+                        throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to HBase column %s - but column family %s isn't configured in %s annotation",
                                 clazz.getName(), field.getName(), hbColumn, hbColumn.family(), HBTable.class.getSimpleName()));
                     }
                     if (hbColumn.isSingleVersioned()) {
@@ -249,8 +246,8 @@ public class HBObjectMapper {
         }
     }
 
-    private <R extends Serializable & Comparable<R>> NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> objToMap(HBRecord<R> obj) {
-        Class<? extends HBRecord> clazz = obj.getClass();
+    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> objToMap(HBRecord<R> obj) {
+        Class<T> clazz = (Class<T>) obj.getClass();
         validateHBClass(clazz);
         NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<>(Bytes.BYTES_COMPARATOR);
         int numOfFieldsToWrite = 0;

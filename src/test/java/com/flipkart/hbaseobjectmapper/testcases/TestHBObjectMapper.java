@@ -33,11 +33,11 @@ public class TestHBObjectMapper {
             triplet(new ClassesWithFieldIncompatibleWithHBColumnMultiVersion.NotMap(), "Class with an incompatible field (not Map) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class),
             triplet(new ClassesWithFieldIncompatibleWithHBColumnMultiVersion.NotNavigableMap(), "Class with an incompatible field (not NavigableMap) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class),
             triplet(new ClassesWithFieldIncompatibleWithHBColumnMultiVersion.EntryKeyNotLong(), "Class with an incompatible field (NavigableMap's entry key not Long) annotated with " + HBColumnMultiVersion.class.getName(), IncompatibleFieldForHBColumnMultiVersionAnnotationException.class),
-            triplet(new ClassesWithInvalidHBTableAnnotation.InvalidVersions(), "Class with an invalid number of versions in it's HBTable annotation", ImproperHBTableAnnotationException.class),
-            triplet(new ClassesWithInvalidHBTableAnnotation.EmptyTableName(), "Class with empty table name in it's HBTable annotation", ImproperHBTableAnnotationException.class),
-            triplet(new ClassesWithInvalidHBTableAnnotation.EmptyColumnFamily(), "Class with empty column family name in it's HBTable annotation", ImproperHBTableAnnotationException.class),
-            triplet(new ClassesWithInvalidHBTableAnnotation.DuplicateColumnFamilies(), "Class with duplicate column families in it's HBTable annotation", ImproperHBTableAnnotationException.class),
-            triplet(new ClassesWithInvalidHBTableAnnotation.MissingHBTableAnnotation(), "Class with no HBTable annotation", ImproperHBTableAnnotationException.class)
+            triplet(new ClassesWithInvalidHBTableAnnotation.InvalidVersions(), "Class with an invalid number of versions in it's HBTable annotation", ImproperHBTableAnnotationExceptions.InvalidValueForVersionsOnHBTableAnnotationException.class),
+            triplet(new ClassesWithInvalidHBTableAnnotation.EmptyTableName(), "Class with empty table name in it's HBTable annotation", ImproperHBTableAnnotationExceptions.EmptyTableNameOnHBTableAnnotationException.class),
+            triplet(new ClassesWithInvalidHBTableAnnotation.EmptyColumnFamily(), "Class with empty column family name in it's HBTable annotation", ImproperHBTableAnnotationExceptions.EmptyColumnFamilyOnHBTableAnnotationException.class),
+            triplet(new ClassesWithInvalidHBTableAnnotation.DuplicateColumnFamilies(), "Class with duplicate column families in it's HBTable annotation", ImproperHBTableAnnotationExceptions.DuplicateColumnFamilyNamesOnHBTableAnnotationException.class),
+            triplet(new ClassesWithInvalidHBTableAnnotation.MissingHBTableAnnotation(), "Class with no HBTable annotation", ImproperHBTableAnnotationExceptions.MissingHBTableAnnotationException.class)
     );
 
     final HBObjectMapper hbMapper = new HBObjectMapper();
@@ -113,21 +113,16 @@ public class TestHBObjectMapper {
         System.out.printf("Time taken for Put->POJO = %dms%n%n", end - start);
     }
 
-    @Test
+    @Test(expected = RowKeyCouldNotBeParsedException.class)
     public void testInvalidRowKey() throws DeserializationException {
-        Citizen e = (Citizen) TestObjects.validObjects.get(0);
-        try {
-            hbMapper.readValue("invalid row key", hbMapper.writeValueAsPut(e), Citizen.class);
-            fail("Invalid row key should've thrown " + RowKeyCouldNotBeParsedException.class.getName());
-        } catch (RowKeyCouldNotBeParsedException ex) {
-            System.out.println("For a simulate HBase row with invalid row key, below Exception was thrown as expected:\n" + ex.getMessage() + "\n");
-        }
+        hbMapper.readValue("invalid row key", hbMapper.writeValueAsPut(TestObjects.validObjects.get(0)), Citizen.class);
     }
 
     @Test
     public void testValidClasses() {
-        assertTrue(hbMapper.isValid(Citizen.class));
-        assertTrue(hbMapper.isValid(CitizenSummary.class));
+        for (Class clazz : Arrays.asList(Citizen.class, CitizenSummary.class, Employee.class, EmployeeSummary.class)) {
+            assertTrue(hbMapper.isValid(clazz));
+        }
     }
 
     @Test

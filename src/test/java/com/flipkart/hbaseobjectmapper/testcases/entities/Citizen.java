@@ -14,7 +14,7 @@ import java.util.NavigableMap;
 @SuppressWarnings("unused")
 @ToString
 @EqualsAndHashCode
-@HBTable(name = "citizens", families = {@Family(name = "main", versions = 1), @Family(name = "optional", versions = 4)})
+@HBTable(name = "citizens", families = {@Family(name = "main"), @Family(name = "optional", versions = 10)})
 public class Citizen implements HBRecord<String> {
     private static final String KEY_DELIM = "#";
     @HBRowKey

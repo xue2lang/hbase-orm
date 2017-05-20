@@ -341,14 +341,14 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     /**
      * Fetch multiple versions of column values by row key and field name
      *
-     * @param rowKey      Row key to reference HBase row
-     * @param fieldName   Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
-     * @param versions Number of versions of column to fetch
+     * @param rowKey    Row key to reference HBase row
+     * @param fieldName Name of the private variable of your bean-like object (of a class that implements {@link HBRecord}) whose corresponding column needs to be fetched
+     * @param versions  Number of versions of column to fetch
      * @return {@link NavigableMap} of timestamps and values of the column (boxed), <code>null</code> if row with given rowKey doesn't exist or such field doesn't exist for the row
      * @throws IOException When HBase call fails
      */
     public NavigableMap<Long, Object> fetchFieldValue(R rowKey, String fieldName, int versions) throws IOException {
-        @SuppressWarnings("unchecked") R[] array = (R[]) Array.newInstance(rowKeyClass, DEFAULT_NUM_VERSIONS);
+        @SuppressWarnings("unchecked") R[] array = (R[]) Array.newInstance(rowKeyClass, 1);
         array[0] = rowKey;
         return fetchFieldValues(array, fieldName, versions).get(rowKey);
 
@@ -389,7 +389,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public NavigableMap<R, NavigableMap<Long, Object>> fetchFieldValues(R startRowKey, R endRowKey, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-        validateFetchInput(field, versions, hbColumn);
+        validateFetchInput(field, hbColumn);
         Scan scan = new Scan(hbObjectMapper.rowKeyToBytes(startRowKey), hbObjectMapper.rowKeyToBytes(endRowKey));
         scan.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         scan.setMaxVersions(versions);
@@ -426,7 +426,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public Map<R, NavigableMap<Long, Object>> fetchFieldValues(R[] rowKeys, String fieldName, int versions) throws IOException {
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-        validateFetchInput(field, versions, hbColumn);
+        validateFetchInput(field, hbColumn);
         List<Get> gets = new ArrayList<>(rowKeys.length);
         for (R rowKey : rowKeys) {
             Get get = new Get(hbObjectMapper.rowKeyToBytes(rowKey));
@@ -442,15 +442,9 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         return map;
     }
 
-    private void validateFetchInput(Field field, int versions, WrappedHBColumn hbColumn) {
+    private void validateFetchInput(Field field, WrappedHBColumn hbColumn) {
         if (!hbColumn.isPresent()) {
             throw new FieldNotMappedToHBaseColumnException(hbRecordClass, field.getName());
-        }
-        if (versions > hbTable.getNumVersions(hbColumn.family())) {
-            throw new IllegalArgumentException(
-                    String.format("You attempted to fetch %d versions of field %s (mapped to HBase column %s) - But column family %s is configured to use max %d versions only",
-                            versions, field.getName(), hbColumn, hbColumn.family(), hbTable.getNumVersions(hbColumn.family())
-                    ));
         }
     }
 
