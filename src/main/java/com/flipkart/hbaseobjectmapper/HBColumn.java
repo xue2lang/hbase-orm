@@ -10,11 +10,14 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Type;
 import java.util.Map;
 
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
  * Maps an entity field to an HBase column
  */
-@Target(ElementType.FIELD)
-@Retention(RetentionPolicy.RUNTIME)
+@Target(FIELD)
+@Retention(RUNTIME)
 public @interface HBColumn {
 
     /**

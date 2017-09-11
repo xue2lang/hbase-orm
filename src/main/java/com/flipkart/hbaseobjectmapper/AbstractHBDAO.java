@@ -1,5 +1,6 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.codec.Codec;
 import com.flipkart.hbaseobjectmapper.exceptions.FieldNotMappedToHBaseColumnException;
 import com.google.common.reflect.TypeToken;
 import org.apache.hadoop.conf.Configuration;
@@ -31,7 +32,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * Default number of versions to fetch
      */
     private static final int DEFAULT_NUM_VERSIONS = 1;
-    protected static final HBObjectMapper hbObjectMapper = new HBObjectMapper();
+    protected final HBObjectMapper hbObjectMapper;
     protected final Connection connection;
     protected final Table table;
     protected final Class<R> rowKeyClass;
@@ -40,14 +41,18 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     private final Map<String, Field> fields;
 
     /**
-     * Constructs a data access object. Classes extending this class <strong>must</strong> call this constructor using <code>super</code>
+     * Constructs a data access object using a custom codec. Classes extending this class <strong>must</strong> call this constructor using <code>super</code>.
+     * <p>
+     * <b>Note: </b>If you want to use the default codec, just use the constructor {@link #AbstractHBDAO(Configuration)}
+     * </p>
      *
      * @param configuration Hadoop configuration
+     * @param codec         Your custom codec. If <code>null</code>, default codec is used.
      * @throws IOException           Exceptions thrown by HBase
      * @throws IllegalStateException Annotation(s) on base entity may be incorrect
      */
     @SuppressWarnings("unchecked")
-    protected AbstractHBDAO(Configuration configuration) throws IOException {
+    protected AbstractHBDAO(Configuration configuration, Codec codec) throws IOException {
         hbRecordClass = (Class<T>) new TypeToken<T>(getClass()) {
         }.getRawType();
         rowKeyClass = (Class<R>) new TypeToken<R>(getClass()) {
@@ -55,10 +60,23 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         if (hbRecordClass == null || rowKeyClass == null) {
             throw new IllegalStateException(String.format("Unable to resolve HBase record/rowkey type (record class is resolving to %s and rowkey class is resolving to %s)", hbRecordClass, rowKeyClass));
         }
+        hbObjectMapper = HBObjectMapperFactory.construct(codec);
         hbTable = new WrappedHBTable<>(hbRecordClass);
         connection = ConnectionFactory.createConnection(configuration);
         table = connection.getTable(hbTable.getName());
         fields = hbObjectMapper.getHBFields(hbRecordClass);
+    }
+
+    /**
+     * Constructs a data access object. Classes extending this class <strong>must</strong> call this constructor using <code>super</code>.
+     *
+     * @param configuration Hadoop configuration
+     * @throws IOException           Exceptions thrown by HBase
+     * @throws IllegalStateException Annotation(s) on base entity may be incorrect
+     */
+    @SuppressWarnings("unchecked")
+    protected AbstractHBDAO(Configuration configuration) throws IOException {
+        this(configuration, null);
     }
 
     /**

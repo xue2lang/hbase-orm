@@ -14,7 +14,6 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hbase.util.Pair;
 
 import java.io.Serializable;
 import java.lang.reflect.*;
@@ -37,6 +36,10 @@ public class HBObjectMapper {
      * @param codec Codec to be used for serialization and deserialization of fields
      */
     public HBObjectMapper(Codec codec) {
+        if (codec == null) {
+            throw new IllegalArgumentException("Parameter 'codec' cannot be null." +
+                    " If you want to use the default codec, use the no-arg constructor");
+        }
         this.codec = codec;
     }
 
@@ -143,45 +146,43 @@ public class HBObjectMapper {
 
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> WrappedHBTable<R, T> validateHBClass(Class<T> clazz) {
         Constructor constructor;
-        WrappedHBTable<R, T> hbTable;
         try {
             constructor = clazz.getDeclaredConstructor();
-            int numOfHBColumns = 0, numOfHBRowKeys = 0;
-            hbTable = new WrappedHBTable<>(clazz);
-            Set<Pair<String, String>> columns = new HashSet<>(clazz.getDeclaredFields().length, 1.0f);
-            for (Field field : clazz.getDeclaredFields()) {
-                if (field.isAnnotationPresent(HBRowKey.class)) {
-                    numOfHBRowKeys++;
-                }
-                WrappedHBColumn hbColumn = new WrappedHBColumn(field);
-                if (hbColumn.isPresent()) {
-                    if (!hbTable.isColumnFamilyPresent(hbColumn.family())) {
-                        throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to HBase column %s - but column family %s isn't configured in %s annotation",
-                                clazz.getName(), field.getName(), hbColumn, hbColumn.family(), HBTable.class.getSimpleName()));
-                    }
-                    if (hbColumn.isSingleVersioned()) {
-                        validateHBColumnSingleVersionField(field);
-                    } else if (hbColumn.isMultiVersioned()) {
-                        validateHBColumnMultiVersionField(field);
-                    }
-                    if (!columns.add(new Pair<>(hbColumn.family(), hbColumn.column()))) {
-                        throw new FieldsMappedToSameColumnException(String.format("Class %s has more than one field (e.g. '%s') mapped to same HBase column %s", clazz.getName(), field.getName(), hbColumn));
-                    }
-                    numOfHBColumns++;
-                }
-            }
-            if (numOfHBColumns == 0) {
-                throw new MissingHBColumnFieldsException(clazz);
-            }
-            if (numOfHBRowKeys == 0) {
-                throw new MissingHBRowKeyFieldsException(clazz);
-            }
-
         } catch (NoSuchMethodException e) {
-            throw new NoEmptyConstructorException(String.format("Class %s needs to specify an empty constructor", clazz.getName()), e);
+            throw new NoEmptyConstructorException(String.format("Class %s needs to specify an empty (public) constructor", clazz.getName()), e);
         }
         if (!Modifier.isPublic(constructor.getModifiers())) {
-            throw new EmptyConstructorInaccessibleException(String.format("Empty constructor of class %s is inaccessible", clazz.getName()));
+            throw new EmptyConstructorInaccessibleException(String.format("Empty constructor of class %s is inaccessible. It needs to be public.", clazz.getName()));
+        }
+        int numOfHBColumns = 0, numOfHBRowKeys = 0;
+        WrappedHBTable<R, T> hbTable = new WrappedHBTable<>(clazz);
+        Set<FamilyAndColumn> columns = new HashSet<>(clazz.getDeclaredFields().length, 1.0f);
+        for (Field field : clazz.getDeclaredFields()) {
+            if (field.isAnnotationPresent(HBRowKey.class)) {
+                numOfHBRowKeys++;
+            }
+            WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+            if (hbColumn.isPresent()) {
+                if (!hbTable.isColumnFamilyPresent(hbColumn.family())) {
+                    throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to HBase column %s - but column family %s isn't configured in %s annotation",
+                            clazz.getName(), field.getName(), hbColumn, hbColumn.family(), HBTable.class.getSimpleName()));
+                }
+                if (hbColumn.isSingleVersioned()) {
+                    validateHBColumnSingleVersionField(field);
+                } else if (hbColumn.isMultiVersioned()) {
+                    validateHBColumnMultiVersionField(field);
+                }
+                if (!columns.add(new FamilyAndColumn(hbColumn.family(), hbColumn.column()))) {
+                    throw new FieldsMappedToSameColumnException(String.format("Class %s has more than one field (e.g. '%s') mapped to same HBase column %s", clazz.getName(), field.getName(), hbColumn));
+                }
+                numOfHBColumns++;
+            }
+        }
+        if (numOfHBColumns == 0) {
+            throw new MissingHBColumnFieldsException(clazz);
+        }
+        if (numOfHBRowKeys == 0) {
+            throw new MissingHBRowKeyFieldsException(clazz);
         }
         return hbTable;
     }
@@ -189,6 +190,7 @@ public class HBObjectMapper {
     /**
      * Internal note: This should be in sync with {@link #getFieldType(Field, boolean)}
      */
+
     private void validateHBColumnMultiVersionField(Field field) {
         validationHBColumnField(field);
         if (!(field.getGenericType() instanceof ParameterizedType)) {
@@ -437,7 +439,7 @@ public class HBObjectMapper {
      * @param clazz  {@link Class} to which you want to convert to (must implement {@link HBRecord} interface)
      * @param <R>    Data type of row key
      * @param <T>    Entity type
-     * @return Bean-like object
+     * @return Object of bean-like class
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(Result result, Class<T> clazz) {
