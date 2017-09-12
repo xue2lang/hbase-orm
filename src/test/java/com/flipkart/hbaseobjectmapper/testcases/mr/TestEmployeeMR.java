@@ -46,7 +46,7 @@ public class TestEmployeeMR extends AbstractMRTest {
                         hbObjectMapper.writeValueAsResult(employee)
 
                 )
-                .withOutput(hbObjectMapper.rowKeyToIbw("key"), new IntWritable(employee.getReporteeCount()))
+                .withOutput(hbObjectMapper.toIbw("key"), new IntWritable(employee.getReporteeCount()))
                 .runTest();
     }
 
@@ -61,7 +61,7 @@ public class TestEmployeeMR extends AbstractMRTest {
 
     @Test
     public void testReducer() throws Exception {
-        Pair<ImmutableBytesWritable, Mutation> reducerResult = employeeReduceDriver.withInput(hbObjectMapper.rowKeyToIbw("key"), Arrays.asList(new IntWritable(1), new IntWritable(5), new IntWritable(0))).run().get(0);
+        Pair<ImmutableBytesWritable, Mutation> reducerResult = employeeReduceDriver.withInput(hbObjectMapper.toIbw("key"), Arrays.asList(new IntWritable(1), new IntWritable(5), new IntWritable(0))).run().get(0);
         EmployeeSummary employeeSummary = hbObjectMapper.readValue(reducerResult.getFirst(), (Put) reducerResult.getSecond(), EmployeeSummary.class);
         assertEquals("Unexpected result from EmployeeMapper", (Float) 2.0f, employeeSummary.getAverageReporteeCount());
     }

@@ -72,7 +72,7 @@ public class TestHBObjectMapper {
     public <R extends Serializable & Comparable<R>> void testResultWithRow(HBRecord<R> p) {
         long start, end;
         Result result = hbMapper.writeValueAsResult(l(p, p)).get(0);
-        ImmutableBytesWritable rowKey = hbMapper.rowKeyToIbw(p.composeRowKey());
+        ImmutableBytesWritable rowKey = hbMapper.toIbw(p.composeRowKey());
         start = System.currentTimeMillis();
         HBRecord pFromResult = hbMapper.readValue(rowKey, result, p.getClass());
         end = System.currentTimeMillis();
@@ -104,7 +104,7 @@ public class TestHBObjectMapper {
     public <R extends Serializable & Comparable<R>> void testPutWithRow(HBRecord<R> p) {
         long start, end;
         Put put = hbMapper.writeValueAsPut(p);
-        ImmutableBytesWritable rowKey = hbMapper.rowKeyToIbw(p.composeRowKey());
+        ImmutableBytesWritable rowKey = hbMapper.toIbw(p.composeRowKey());
         start = System.currentTimeMillis();
         HBRecord pFromPut = hbMapper.readValue(rowKey, put, p.getClass());
         end = System.currentTimeMillis();
@@ -114,7 +114,7 @@ public class TestHBObjectMapper {
 
     @Test(expected = RowKeyCouldNotBeParsedException.class)
     public void testInvalidRowKey() {
-        hbMapper.readValue(hbMapper.rowKeyToIbw("invalid row key"), hbMapper.writeValueAsPut(TestObjects.validObjects.get(0)), Citizen.class);
+        hbMapper.readValue(hbMapper.toIbw("invalid row key"), hbMapper.writeValueAsPut(TestObjects.validObjects.get(0)), Citizen.class);
     }
 
     @Test
@@ -239,7 +239,7 @@ public class TestHBObjectMapper {
 
             }
         });
-        assertEquals("Row keys don't match", rowKey, hbMapper.rowKeyToIbw("rowkey"));
+        assertEquals("Row keys don't match", rowKey, hbMapper.toIbw("rowkey"));
         try {
             hbMapper.getRowKey(new HBRecord<String>() {
                 @Override

@@ -4,6 +4,9 @@ import java.io.*;
 import java.lang.reflect.Type;
 import java.util.Map;
 
+/**
+ * Just a reference implementation, kept here for testing purposes. In real world, you should <b>never</b> use this codec. Either use the {@link BestSuitCodec} or write your own.
+ */
 public class JavaObjectStreamCodec implements Codec {
     /*
      * @inherit

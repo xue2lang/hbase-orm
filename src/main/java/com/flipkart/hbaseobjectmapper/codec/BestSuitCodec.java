@@ -25,12 +25,12 @@ import java.util.Map;
  * <p>
  * This codec takes the following {@link Flag Flag}s:
  * <ul>
- * <li><b><code>{@link #SERIALISE_AS_STRING}</code></b>: When passed, it indicates this codec to store field value in it's string representation (e.g. <b>560034</b> is serialized into a <code>byte[]</code> that represents the string <b>"560034"</b>). Note that, this flag applies only to fields of data types in point 1 above.</li>
+ * <li><b><code>{@link #SERIALIZE_AS_STRING}</code></b>: When passed, it indicates this codec to store field value in it's string representation (e.g. <b>560034</b> is serialized into a <code>byte[]</code> that represents the string <b>"560034"</b>). Note that, this flag applies only to fields of data types in point 1 above.</li>
  * </ul>
  */
 
 public class BestSuitCodec implements Codec {
-    public static final String SERIALISE_AS_STRING = "serializeAsString";
+    public static final String SERIALIZE_AS_STRING = "serializeAsString";
 
     private static final Map<Class, String> fromBytesMethodNames = new HashMap<Class, String>() {
         {
@@ -175,6 +175,6 @@ public class BestSuitCodec implements Codec {
     }
 
     private boolean isSerializeAsStringOn(Map<String, String> flags) {
-        return flags != null && flags.get(SERIALISE_AS_STRING) != null && flags.get(SERIALISE_AS_STRING).equalsIgnoreCase("true");
+        return flags != null && flags.get(SERIALIZE_AS_STRING) != null && flags.get(SERIALIZE_AS_STRING).equalsIgnoreCase("true");
     }
 }
