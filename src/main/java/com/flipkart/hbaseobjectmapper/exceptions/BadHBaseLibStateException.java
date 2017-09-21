@@ -8,7 +8,7 @@ import com.flipkart.hbaseobjectmapper.HBObjectMapper;
 public class BadHBaseLibStateException extends IllegalStateException {
     private static final String BAD_HBASE_STATE_ERROR = "Unknown error - possibly, HBase library is unavailable at runtime or an incorrect/unsupported version of HBase is being used";
 
-    public BadHBaseLibStateException(Throwable throwable) {
-        super(BAD_HBASE_STATE_ERROR, throwable);
+    public BadHBaseLibStateException(Exception cause) {
+        super(BAD_HBASE_STATE_ERROR, cause);
     }
 }

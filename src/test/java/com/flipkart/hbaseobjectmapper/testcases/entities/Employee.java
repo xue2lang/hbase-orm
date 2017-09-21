@@ -1,14 +1,13 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
 import com.flipkart.hbaseobjectmapper.*;
-import com.flipkart.hbaseobjectmapper.codec.BestSuitCodec;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 @SuppressWarnings("unused")
 @ToString
 @EqualsAndHashCode
-@HBTable(name = "employees", families = {@Family(name = "a")}, rowKeyCodecFlags = {@Flag(name = BestSuitCodec.SERIALIZE_AS_STRING, value = "false")})
+@HBTable(name = "employees", families = {@Family(name = "a")})
 public class Employee implements HBRecord<Long> {
     @HBRowKey
     private Long empid;

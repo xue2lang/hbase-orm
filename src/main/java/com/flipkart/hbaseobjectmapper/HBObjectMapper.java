@@ -20,7 +20,7 @@ import java.lang.reflect.*;
 import java.util.*;
 
 /**
- * <p>An <b>object mapper class</b> that helps convert objects of your bean-like class to HBase's {@link Put} and {@link Result} objects (and vice-versa). Your 'bean-like class' should preferably follow <a href="https://en.wikipedia.org/wiki/JavaBeansJavaBean_conventions">JavaBeans conventions</a> and must implement {@link HBRecord} interface.</p>
+ * <p>An <b>object mapper class</b> that helps convert/serialize objects of your bean-like class to HBase's {@link Put} and {@link Result} objects (and vice-versa). Your 'bean-like class' <b>must</b> implement {@link HBRecord} interface and should preferably follow <a href="https://en.wikipedia.org/wiki/JavaBeansJavaBean_conventions">JavaBeans conventions</a>.</p>
  * <p>This class is for use in MapReduce jobs which <i>read from</i> and/or <i>write to</i> HBase tables and their unit-tests. <b>This class is thread-safe</b>.</p>
  */
 public class HBObjectMapper {
@@ -60,25 +60,26 @@ public class HBObjectMapper {
     }
 
     @SuppressWarnings("unchecked")
-    <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Class<T> entityClass) {
+    <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Map<String, String> codecFlags, Class<T> entityClass) {
         try {
-            return (R) byteArrayToValue(rowKeyBytes, entityClass.getDeclaredMethod("composeRowKey").getReturnType(), null);
+            return (R) byteArrayToValue(rowKeyBytes, entityClass.getDeclaredMethod("composeRowKey").getReturnType(), codecFlags);
         } catch (NoSuchMethodException e) {
             throw new InternalError(e);
         }
     }
 
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T mapToObj(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
-        R rowKey = bytesToRowKey(rowKeyBytes, clazz);
-        T obj;
+        WrappedHBTable<R, T> hbTable = new WrappedHBTable<>(clazz);
+        R rowKey = bytesToRowKey(rowKeyBytes, hbTable.getCodecFlags(), clazz);
+        T record;
         validateHBClass(clazz);
         try {
-            obj = clazz.newInstance();
+            record = clazz.newInstance();
         } catch (Exception ex) {
             throw new ObjectNotInstantiatableException("Error while instantiating empty constructor of " + clazz.getName(), ex);
         }
         try {
-            obj.parseRowKey(rowKey);
+            record.parseRowKey(rowKey);
         } catch (Exception ex) {
             throw new RowKeyCouldNotBeParsedException(String.format("Supplied row key \"%s\" could not be parsed", rowKey), ex);
         }
@@ -93,16 +94,16 @@ public class HBObjectMapper {
                     if (columnVersionsMap == null || columnVersionsMap.isEmpty())
                         continue;
                     Map.Entry<Long, byte[]> lastEntry = columnVersionsMap.lastEntry();
-                    objectSetFieldValue(obj, field, lastEntry.getValue(), hbColumn.codecFlags());
+                    objectSetFieldValue(record, field, lastEntry.getValue(), hbColumn.codecFlags());
                 } else {
-                    objectSetFieldValue(obj, field, columnVersionsMap, hbColumn.codecFlags());
+                    objectSetFieldValue(record, field, columnVersionsMap, hbColumn.codecFlags());
                 }
             }
         }
-        return obj;
+        return record;
     }
 
-    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> boolean isFieldNull(Field field, HBRecord<R> obj) {
+    private static <R extends Serializable & Comparable<R>> boolean isFieldNull(Field field, HBRecord<R> obj) {
         try {
             field.setAccessible(true);
             return field.get(obj) == null;
@@ -132,6 +133,7 @@ public class HBObjectMapper {
      *
      * @param value Object to be serialized
      * @return Byte array, wrapped in HBase's data type
+     * @see #getRowKey
      */
     public ImmutableBytesWritable toIbw(Serializable value) {
         return new ImmutableBytesWritable(valueToByteArray(value, null));
@@ -239,6 +241,7 @@ public class HBObjectMapper {
         }
     }
 
+    @SuppressWarnings("unchecked")
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> objToMap(HBRecord<R> obj) {
         Class<T> clazz = (Class<T>) obj.getClass();
         validateHBClass(clazz);
@@ -415,7 +418,7 @@ public class HBObjectMapper {
      * @param clazz  {@link Class} to which you want to convert to (must implement {@link HBRecord} interface)
      * @param <R>    Data type of row key
      * @param <T>    Entity type
-     * @return Bean-like object
+     * @return Object of bean-like class
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(ImmutableBytesWritable rowKey, Result result, Class<T> clazz) {
@@ -512,7 +515,7 @@ public class HBObjectMapper {
      * @param clazz  {@link Class} to which you want to convert to (must implement {@link HBRecord} interface)
      * @param <R>    Data type of row key
      * @param <T>    Entity type
-     * @return Bean-like object
+     * @return Object of bean-like class
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(ImmutableBytesWritable rowKey, Put put, Class<T> clazz) {
@@ -531,7 +534,7 @@ public class HBObjectMapper {
      * @param clazz  {@link Class} to which you want to convert to (must implement {@link HBRecord} interface)
      * @param <R>    Data type of row key
      * @param <T>    Entity type
-     * @return Bean-like object
+     * @return Object of bean-like class
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Put put, Class<T> clazz) {
@@ -575,7 +578,7 @@ public class HBObjectMapper {
      * @param clazz {@link Class} to which you want to convert to (must implement {@link HBRecord} interface)
      * @param <R>   Data type of row key
      * @param <T>   Entity type
-     * @return Bean-like object
+     * @return Object of bean-like class
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(Put put, Class<T> clazz) {
@@ -592,7 +595,8 @@ public class HBObjectMapper {
      *
      * @param record object of your bean-like class (of type that extends {@link HBRecord})
      * @param <R>    Data type of row key
-     * @return Row key
+     * @return Serialised row key wrapped in {@link ImmutableBytesWritable}
+     * @see #toIbw(Serializable)
      */
     public <R extends Serializable & Comparable<R>> ImmutableBytesWritable getRowKey(HBRecord<R> record) {
         if (record == null) {
@@ -601,7 +605,7 @@ public class HBObjectMapper {
         return new ImmutableBytesWritable(composeRowKey(record));
     }
 
-    private <R extends Serializable & Comparable<R>> byte[] composeRowKey(HBRecord<R> record) {
+    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> byte[] composeRowKey(HBRecord<R> record) {
         R rowKey;
         try {
             rowKey = record.composeRowKey();
@@ -611,9 +615,8 @@ public class HBObjectMapper {
         if (rowKey == null || rowKey.toString().isEmpty()) {
             throw new RowKeyCantBeEmptyException();
         }
-        WrappedHBTable hbTable = new WrappedHBTable(record.getClass());
+        WrappedHBTable<R, T> hbTable = new WrappedHBTable<>((Class<T>) record.getClass());
         return valueToByteArray(rowKey, hbTable.getCodecFlags());
-
     }
 
     /**

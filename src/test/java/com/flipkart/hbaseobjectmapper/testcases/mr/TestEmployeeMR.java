@@ -39,7 +39,7 @@ public class TestEmployeeMR extends AbstractMRTest {
 
     @Test
     public void testSingleMapper() throws IOException {
-        Employee employee = (Employee) TestObjects.validEmployeeObjectsNoVersion.get(1);
+        Employee employee = (Employee) TestObjects.validEmployeeObjects.get(1);
         employeeMapDriver
                 .withInput(
                         hbObjectMapper.getRowKey(employee),
@@ -52,7 +52,7 @@ public class TestEmployeeMR extends AbstractMRTest {
 
     @Test
     public void testMultipleMappers() throws IOException {
-        List<Pair<ImmutableBytesWritable, Result>> hbRecords = MRTestUtil.writeValueAsRowKeyResultPair(TestObjects.validEmployeeObjectsNoVersion);
+        List<Pair<ImmutableBytesWritable, Result>> hbRecords = MRTestUtil.writeValueAsRowKeyResultPair(TestObjects.validEmployeeObjects);
         List<Pair<ImmutableBytesWritable, IntWritable>> mapResults = employeeMapDriver.withAll(hbRecords).run();
         for (Pair<ImmutableBytesWritable, IntWritable> mapResult : mapResults) {
             assertEquals("Rowkey got corrupted in Mapper", Bytes.toString(mapResult.getFirst().get()), "key");

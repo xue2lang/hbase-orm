@@ -36,7 +36,7 @@ import java.util.*;
 public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T extends HBRecord<R>> implements Closeable {
 
     /**
-     * Default number of versions to fetch. This may be changed to {@link Integer#MAX_VALUE} if default behavior needs to be changed to 'all versions'.
+     * Default number of versions to fetch. Change this to {@link Integer#MAX_VALUE} if you want the default behavior to be 'all versions'.
      */
     private static final int DEFAULT_NUM_VERSIONS = 1;
     protected final HBObjectMapper hbObjectMapper;
@@ -95,7 +95,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public T get(R rowKey, int versions) throws IOException {
-        Result result = this.table.get(new Get(hbObjectMapper.rowKeyToBytes(rowKey, hbTable.getCodecFlags())).setMaxVersions(versions));
+        Result result = this.table.get(new Get(toBytes(rowKey)).setMaxVersions(versions));
         return hbObjectMapper.readValue(rowKey, result, hbRecordClass);
     }
 
@@ -122,7 +122,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public T[] get(R[] rowKeys, int versions) throws IOException {
         List<Get> gets = new ArrayList<>(rowKeys.length);
         for (R rowKey : rowKeys) {
-            gets.add(new Get(hbObjectMapper.rowKeyToBytes(rowKey, hbTable.getCodecFlags())).setMaxVersions(versions));
+            gets.add(new Get(toBytes(rowKey)).setMaxVersions(versions));
         }
         Result[] results = this.table.get(gets);
         @SuppressWarnings("unchecked") T[] records = (T[]) Array.newInstance(hbRecordClass, rowKeys.length);
@@ -154,7 +154,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public List<T> get(List<R> rowKeys, int versions) throws IOException {
         List<Get> gets = new ArrayList<>(rowKeys.size());
         for (R rowKey : rowKeys) {
-            gets.add(new Get(hbObjectMapper.rowKeyToBytes(rowKey, hbTable.getCodecFlags())).setMaxVersions(versions));
+            gets.add(new Get(toBytes(rowKey)).setMaxVersions(versions));
         }
         Result[] results = this.table.get(gets);
         List<T> records = new ArrayList<>(rowKeys.size());
@@ -185,7 +185,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public List<T> get(R startRowKey, R endRowKey, int versions) throws IOException {
-        Scan scan = new Scan(hbObjectMapper.rowKeyToBytes(startRowKey, hbTable.getCodecFlags()), hbObjectMapper.rowKeyToBytes(endRowKey, hbTable.getCodecFlags())).setMaxVersions(versions);
+        Scan scan = new Scan(toBytes(startRowKey), toBytes(endRowKey)).setMaxVersions(versions);
         ResultScanner scanner = table.getScanner(scan);
         List<T> records = new ArrayList<>();
         for (Result result : scanner) {
@@ -245,7 +245,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public void delete(R rowKey) throws IOException {
-        Delete delete = new Delete(hbObjectMapper.rowKeyToBytes(rowKey, hbTable.getCodecFlags()));
+        Delete delete = new Delete(toBytes(rowKey));
         this.table.delete(delete);
     }
 
@@ -268,7 +268,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public void delete(R[] rowKeys) throws IOException {
         List<Delete> deletes = new ArrayList<>(rowKeys.length);
         for (R rowKey : rowKeys) {
-            deletes.add(new Delete(hbObjectMapper.rowKeyToBytes(rowKey, hbTable.getCodecFlags())));
+            deletes.add(new Delete(toBytes(rowKey)));
         }
         this.table.delete(deletes);
     }
@@ -282,7 +282,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public void delete(List<? extends HBRecord<R>> records) throws IOException {
         List<Delete> deletes = new ArrayList<>(records.size());
         for (HBRecord<R> record : records) {
-            deletes.add(new Delete(hbObjectMapper.rowKeyToBytes(record.composeRowKey(), hbTable.getCodecFlags())));
+            deletes.add(new Delete(toBytes(record.composeRowKey())));
         }
         this.table.delete(deletes);
     }
@@ -341,7 +341,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         List<Cell> cells = result.getColumnCells(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         for (Cell cell : cells) {
             Type fieldType = hbObjectMapper.getFieldType(field, hbColumn.isMultiVersioned());
-            final R rowKey = hbObjectMapper.bytesToRowKey(CellUtil.cloneRow(cell), (Class<T>) field.getDeclaringClass());
+            final R rowKey = hbObjectMapper.bytesToRowKey(CellUtil.cloneRow(cell), hbTable.getCodecFlags(), (Class<T>) field.getDeclaringClass());
             if (!map.containsKey(rowKey)) {
                 map.put(rowKey, new TreeMap<Long, Object>());
             }
@@ -416,7 +416,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         Field field = getField(fieldName);
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         validateFetchInput(field, hbColumn);
-        Scan scan = new Scan(hbObjectMapper.rowKeyToBytes(startRowKey, hbTable.getCodecFlags()), hbObjectMapper.rowKeyToBytes(endRowKey, hbTable.getCodecFlags()));
+        Scan scan = new Scan(toBytes(startRowKey), toBytes(endRowKey));
         scan.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
         scan.setMaxVersions(versions);
         ResultScanner scanner = table.getScanner(scan);
@@ -455,7 +455,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         validateFetchInput(field, hbColumn);
         List<Get> gets = new ArrayList<>(rowKeys.length);
         for (R rowKey : rowKeys) {
-            Get get = new Get(hbObjectMapper.rowKeyToBytes(rowKey, hbTable.getCodecFlags()));
+            Get get = new Get(toBytes(rowKey));
             get.setMaxVersions(versions);
             get.addColumn(Bytes.toBytes(hbColumn.family()), Bytes.toBytes(hbColumn.column()));
             gets.add(get);
@@ -466,6 +466,10 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
             populateFieldValuesToMap(field, result, map);
         }
         return map;
+    }
+
+    private byte[] toBytes(R rowKey) {
+        return hbObjectMapper.rowKeyToBytes(rowKey, hbTable.getCodecFlags());
     }
 
     private void validateFetchInput(Field field, WrappedHBColumn hbColumn) {
