@@ -614,6 +614,7 @@ public class HBObjectMapper {
         if (rowKey == null || rowKey.toString().isEmpty()) {
             throw new RowKeyCantBeEmptyException();
         }
+        @SuppressWarnings("unchecked")
         WrappedHBTable<R, T> hbTable = new WrappedHBTable<>((Class<T>) record.getClass());
         return valueToByteArray(rowKey, hbTable.getCodecFlags());
     }
