@@ -1,4 +1,8 @@
 # HBase Object Mapper
+[![][travis img]][travis]
+[![][sonatype img]][sonatype]
+[![][coverage img]][coverage]
+[![][license img]][license]
 
 ## Introduction
 This light-weighted HBase ORM library is an annotation based *object mapper* for HBase that helps you:
