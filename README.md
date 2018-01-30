@@ -287,3 +287,11 @@ Copyright 2018 Flipkart Internet Pvt Ltd.
 
 Licensed under the [Apache License, version 2.0](http://www.apache.org/licenses/LICENSE-2.0) (the "License"). You may not use this product or it's source code except in compliance with the License.
 
+[travis]:https://travis-ci.org/flipkart-incubator/hbase-object-mapper
+[travis img]:https://travis-ci.org/flipkart-incubator/hbase-object-mapper.svg?branch=master
+[sonatype]:https://oss.sonatype.org/content/repositories/releases/com/flipkart/hbase-object-mapper/1.9/
+[sonatype img]:https://img.shields.io/badge/sonatype-1.9-orange.svg
+[coverage]:https://coveralls.io/github/flipkart-incubator/hbase-object-mapper?branch=master
+[coverage img]:https://coveralls.io/repos/github/flipkart-incubator/hbase-object-mapper/badge.svg?branch=master
+[license]:LICENSE
+[license img]:https://img.shields.io/badge/License-Apache%202-blue.svg
