@@ -1,7 +1,7 @@
-# HBase Object Mapper
+# HBase ORM
 
 ## Introduction
-This light-weighted HBase ORM library is an annotation based *object mapper* for HBase that helps you:
+An ultra-light-weight HBase ORM library that helps you:
 
 * convert objects of your bean-like classes to HBase rows and vice-versa
     * for use in Hadoop MapReduce jobs that read from and/or write to HBase tables
@@ -173,7 +173,7 @@ CitizenSummary citizenSummary = hbObjectMapper.readValue(
 
 Again, see file [TestCitizenMR.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/mr/TestCitizenMR.java) for full sample code.
 
-## HBase ORM
+## Random access
 This library provides an abstract class to define your own *data access object*. For example you can create a *data access object* for `Citizen` class in the above example as follows:
 
 ```java

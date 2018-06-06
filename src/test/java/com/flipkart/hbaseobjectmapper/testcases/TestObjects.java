@@ -4,7 +4,6 @@ import com.flipkart.hbaseobjectmapper.HBColumnMultiVersion;
 import com.flipkart.hbaseobjectmapper.HBRecord;
 import com.flipkart.hbaseobjectmapper.exceptions.AllHBColumnFieldsNullException;
 import com.flipkart.hbaseobjectmapper.exceptions.FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty;
-import com.flipkart.hbaseobjectmapper.exceptions.HBRowKeyFieldCantBeNullException;
 import com.flipkart.hbaseobjectmapper.testcases.entities.*;
 import org.javatuples.Triplet;
 
@@ -85,9 +84,6 @@ public class TestObjects {
     @SuppressWarnings("unchecked")
     public static final List<Triplet<HBRecord, String, Class<? extends IllegalArgumentException>>> invalidObjects = Arrays.asList(
             triplet(new Citizen("IND", -1, null, null, null, null, null, null, null, null, null, null, null, null, null), "all fields empty", AllHBColumnFieldsNullException.class),
-            triplet(new Citizen(null, -2, "row key field null 1", null, null, null, null, null, null, null, null, null, null, null, null), "one row key field null (variant 1)", HBRowKeyFieldCantBeNullException.class),
-            triplet(new Citizen("IND", null, "row key field null 2", null, null, null, null, null, null, null, null, null, null, null, null), "one row key field null (variant 2)", HBRowKeyFieldCantBeNullException.class),
-            triplet(new Citizen(null, null, "row key fields null", null, null, null, null, null, null, null, null, null, null, null, null), "all row key fields null", HBRowKeyFieldCantBeNullException.class),
             triplet(new Citizen("IND", 1, "row key", null, null, null, null, null, null, null, null, new TreeMap<Long, Integer>(), null, null, null), "an empty field annotated with @" + HBColumnMultiVersion.class.getName(), FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty.class)
     );
 }
