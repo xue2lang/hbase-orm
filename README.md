@@ -1,13 +1,12 @@
 # HBase ORM
 
 ## Introduction
-An ultra-light-weight HBase ORM library that helps you:
+An ultra-light-weight HBase ORM library that enables
 
-* convert objects of your bean-like classes to HBase rows and vice-versa
-    * for use in Hadoop MapReduce jobs that read from and/or write to HBase tables
-    * and write efficient unit-tests for `Mapper` and `Reducer` classes
-* define *data access objects* for entities that map to HBase rows
-    * for single/range/bulk access of rows of an HBase table
+1. reading from and/or writing to HBase tables in Hadoop MapReduce jobs
+2. object-oriented access of HBase rows ([Data Access Object](https://en.wikipedia.org/wiki/Data_access_object))
+3. writing high-quality test cases for classes that interact with HBase
+
 
 ## Usage
 Let's say you've an HBase table `citizens` with row-key format of `country_code#UID`. Now, let's say your table is created with three column families `main`, `optional` and `tracked`, which may have columns `uid`, `name`, `salary` etc.
@@ -69,17 +68,17 @@ That is,
 * The class may contain fields of simple data types (e.g. `String`, `Integer`), generic data types (e.g. `Map`, `List`), custom class (e.g. `Dependents`) or even generics of custom class (e.g. `List<Dependent>`) 
 * The `@HBColumnMultiVersion` annotation allows you to map multiple versions of column in a `NavigableMap<Long, ?>`. In above example, field `phoneNumber` is mapped to column `phone_number` within the column family `tracked` (which is configured for multiple versions)
 
-See source files [Citizen.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/entities/Citizen.java) and [Employee.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/entities/Employee.java) for detailed examples.
+See source files [Citizen.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/entities/Citizen.java) and [Employee.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/entities/Employee.java) for detailed examples. Specifically, [Employee.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/entities/Employee.java) demonstrates using "column inheritance" of this library, a useful feature if you have many HBase tables with common set of columns.
 
-### Serialization / Deserialization
+### Serialization / Deserialization mechanism
 
 * The default codec of this library has the following behavior:
     * uses HBase's native methods to serialize objects of data types `Boolean`, `Short`, `Integer`, `Long`, `Float`, `Double`, `String` and `BigDecimal`
     * uses [Jackson's JSON serializer](http://wiki.fasterxml.com/JacksonHome) for all other data types
     * serializes `null` as `null`
-* To control/modify serialization/deserialization behavior, you may define your own codec (by implementing the `Codec` interface) or you may extend the default codec (`BestSuitCodec`).
+* To customize serialization/deserialization behavior, you may define your own codec (by implementing the [Codec](./src/main/java/com/flipkart/hbaseobjectmapper/codec/Codec.java) interface) or you may extend the default codec ([BestSuitCodec](./src/main/java/com/flipkart/hbaseobjectmapper/codec/BestSuitCodec.java)).
 * The optional parameter `codecFlag` (supported by both `@HBColumn` and `@HBColumnMultiVersion` annotations) can be used to pass custom flags to the underlying codec. (e.g. You may write your codec to serialize field `Integer id` in `Citizen` class differently from field `Integer id` in `Employee` class)
-* The default codec class `BestSuitCodec` takes a flag `BestSuitCodec.SERIALIZE_AS_STRING`, whose value is "serializeAsString" (as in the above `Citizen` class example). When this flag is set to `true` on a field, the default codec serializes that field (even numerical fields) as `String`s.
+* The default codec class `BestSuitCodec` takes a flag `BestSuitCodec.SERIALIZE_AS_STRING`, whose value is "serializeAsString" (as in the above `Citizen` class example). When this flag is set to `true` on a field, the default codec serializes that field (even numerical fields) as strings.
     * Your custom codec may take other such flags to customize serialization/deserialization behavior at a class field level.
 
 ## MapReduce use-cases
@@ -173,7 +172,7 @@ CitizenSummary citizenSummary = hbObjectMapper.readValue(
 
 Again, see file [TestCitizenMR.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/mr/TestCitizenMR.java) for full sample code.
 
-## Random access
+## Random access (DAO) use-cases
 This library provides an abstract class to define your own *data access object*. For example you can create a *data access object* for `Citizen` class in the above example as follows:
 
 ```java
@@ -224,16 +223,18 @@ citizenDao.delete("IND#2"); // Delete a row by it's row key
 
 citizenDao.delete(new String[] {"IND#3", "IND#4"}); // Delete a bunch of rows by their row keys
 
-citizenDao.getGet("IND#2"); // returns object of HBase's Get corresponding to row key "IND#2", to enable advanced read patterns
+Get get1 = citizenDao.getGet("IND#2"); // returns object of HBase's Get corresponding to row key "IND#2", to enable advanced read patterns
+counterDAO.getOnGets(get1); 
 
-citizenDao.getGet("IND#2").setTimeRange(1, 5).setMaxVersions(2); // Advanced HBase row fetch
+Get get2 = citizenDao.getGet("IND#2").setTimeRange(1, 5).setMaxVersions(2); // Advanced HBase row fetch
+counterDAO.getOnGets(get2); 
 
 citizenDao.getHBaseTable() // returns HTable instance (in case you want to directly play around) 
 
 ```
 (see [TestsAbstractHBDAO.java](./src/test/java/com/flipkart/hbaseobjectmapper/testcases/TestsAbstractHBDAO.java) for more detailed examples)
 
-**Please note:** Since we're dealing with HBase (and not an OLTP data store), fitting a classical ORM paradigm may not make sense. So this library doesn't intend to evolve as a full-fledged ORM. However, if you do intend to use HBase via an ORM library, I suggest you use [Apache Phoenix](https://phoenix.apache.org/).
+**Please note:** Since we're dealing with HBase (and not an OLTP data store), fitting a classical (Hibernate-like) ORM paradigm may not make sense. So this library doesn't intend to evolve as a full-fledged ORM. However, if that's your intent, I suggest you use [Apache Phoenix](https://phoenix.apache.org/).
 
 
 ## Limitations
@@ -271,11 +272,11 @@ Currently, projects that use this library are running on [Hortonworks Data Platf
 
 ## Releases
 
-The change log can be found in the [releases](//github.com/flipkart-incubator/hbase-object-mapper/releases) section.
+The change log can be found in the [releases](//github.com/flipkart-incubator/hbase-orm/releases) section.
 
 ## Feature requests and bug reporting
 
-If you intend to request a feature or report a bug, you may use [Github Issues for hbase-object-mapper](//github.com/flipkart-incubator/hbase-object-mapper/issues).
+If you intend to request a feature or report a bug, you may use [Github Issues for hbase-orm](//github.com/flipkart-incubator/hbase-orm/issues).
 
 ## License
 

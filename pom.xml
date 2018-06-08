@@ -7,7 +7,7 @@
         An ultra-light-weight HBase ORM library that enables
         [1] object-oriented access of HBase rows (Data Access Object)
         [2] reading from and/or writing to HBase tables in Hadoop MapReduce jobs
-        [3] writing high-quality test cases on classes that interact with HBase
+        [3] writing high-quality test cases for classes that interact with HBase
     </description>
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.flipkart</groupId>
