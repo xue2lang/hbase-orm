@@ -81,7 +81,7 @@ public class HBObjectMapper {
      * Core method that drives serialization
      */
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T convertMapToRecord(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
-        Collection<Field> fields = getHBColumnFields(clazz).values();
+        Collection<Field> fields = getHBColumnFields0(clazz).values();
         WrappedHBTable<R, T> hbTable = new WrappedHBTable<>(clazz);
         R rowKey = bytesToRowKey(rowKeyBytes, hbTable.getCodecFlags(), clazz);
         T record;
@@ -140,7 +140,7 @@ public class HBObjectMapper {
         return new ImmutableBytesWritable(valueToByteArray(value, null));
     }
 
-    private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> WrappedHBTable<R, T> validateHBClass(Class<T> clazz) {
+    <R extends Serializable & Comparable<R>, T extends HBRecord<R>> WrappedHBTable<R, T> validateHBClass(Class<T> clazz) {
         Constructor constructor;
         try {
             constructor = clazz.getDeclaredConstructor();
@@ -157,10 +157,16 @@ public class HBObjectMapper {
             if (field.isAnnotationPresent(HBRowKey.class)) {
                 numOfHBRowKeys++;
             }
+        }
+        if (numOfHBRowKeys == 0) {
+            throw new MissingHBRowKeyFieldsException(clazz);
+        }
+        Map<String, Field> hbColumnFields = getHBColumnFields0(clazz);
+        for (Field field : hbColumnFields.values()) {
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
             if (hbColumn.isPresent()) {
                 if (!hbTable.isColumnFamilyPresent(hbColumn.family())) {
-                    throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to HBase column %s - but column family %s isn't configured in %s annotation",
+                    throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to HBase column '%s' - but column family '%s' isn't configured in @%s annotation",
                             clazz.getName(), field.getName(), hbColumn, hbColumn.family(), HBTable.class.getSimpleName()));
                 }
                 if (hbColumn.isSingleVersioned()) {
@@ -176,9 +182,6 @@ public class HBObjectMapper {
         }
         if (numOfHBColumns == 0) {
             throw new MissingHBColumnFieldsException(clazz);
-        }
-        if (numOfHBRowKeys == 0) {
-            throw new MissingHBRowKeyFieldsException(clazz);
         }
         return hbTable;
     }
@@ -247,7 +250,7 @@ public class HBObjectMapper {
     @SuppressWarnings("unchecked")
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> convertRecordToMap(HBRecord<R> record) {
         Class<T> clazz = (Class<T>) record.getClass();
-        Collection<Field> fields = getHBColumnFields(clazz).values();
+        Collection<Field> fields = getHBColumnFields0(clazz).values();
         NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<>(Bytes.BYTES_COMPARATOR);
         int numOfFieldsToWrite = 0;
         for (Field field : fields) {
@@ -330,6 +333,7 @@ public class HBObjectMapper {
      * @return HBase's {@link Put} object
      */
     public <R extends Serializable & Comparable<R>> Put writeValueAsPut(HBRecord<R> record) {
+        validateHBClass(record.getClass());
         Put put = new Put(composeRowKey(record));
         for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : convertRecordToMap(record).entrySet()) {
             byte[] family = fe.getKey();
@@ -371,6 +375,7 @@ public class HBObjectMapper {
      * @return HBase's {@link Result} object
      */
     public <R extends Serializable & Comparable<R>> Result writeValueAsResult(HBRecord<R> record) {
+        validateHBClass(record.getClass());
         byte[] row = composeRowKey(record);
         List<Cell> cellList = new ArrayList<>();
         for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : convertRecordToMap(record).entrySet()) {
@@ -417,6 +422,7 @@ public class HBObjectMapper {
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(ImmutableBytesWritable rowKey, Result result, Class<T> clazz) {
+        validateHBClass(clazz);
         if (rowKey == null)
             return readValueFromResult(result, clazz);
         else
@@ -434,6 +440,7 @@ public class HBObjectMapper {
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(Result result, Class<T> clazz) {
+        validateHBClass(clazz);
         return readValueFromResult(result, clazz);
     }
 
@@ -514,6 +521,7 @@ public class HBObjectMapper {
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(ImmutableBytesWritable rowKey, Put put, Class<T> clazz) {
+        validateHBClass(clazz);
         if (rowKey == null)
             return readValueFromPut(put, clazz);
         else
@@ -577,6 +585,7 @@ public class HBObjectMapper {
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(Put put, Class<T> clazz) {
+        validateHBClass(clazz);
         return readValueFromPut(put, clazz);
     }
 
@@ -597,6 +606,7 @@ public class HBObjectMapper {
         if (record == null) {
             throw new NullPointerException("Cannot compose row key for null objects");
         }
+        validateHBClass(record.getClass());
         return new ImmutableBytesWritable(composeRowKey(record));
     }
 
@@ -656,12 +666,20 @@ public class HBObjectMapper {
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Map<String, Field> getHBColumnFields(Class<T> clazz) {
         validateHBClass(clazz);
-        final Field[] declaredFields = clazz.getDeclaredFields();
-        Map<String, Field> mappings = new HashMap<>(declaredFields.length, 1.0f);
-        for (Field field : declaredFields) {
-            if (new WrappedHBColumn(field).isPresent()) {
-                mappings.put(field.getName(), field);
+        return getHBColumnFields0(clazz);
+    }
+
+    <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Map<String, Field> getHBColumnFields0(Class<T> clazz) {
+        Map<String, Field> mappings = new HashMap<>();
+        Class thisClass = clazz;
+        while (thisClass != null && thisClass != Object.class) {
+            for (Field field : thisClass.getDeclaredFields()) {
+                if (new WrappedHBColumn(field).isPresent()) {
+                    mappings.put(field.getName(), field);
+                }
             }
+            Class parentClass = thisClass.getSuperclass();
+            thisClass = parentClass.isAnnotationPresent(MappedSuperClass.class) ? parentClass : null;
         }
         return mappings;
     }

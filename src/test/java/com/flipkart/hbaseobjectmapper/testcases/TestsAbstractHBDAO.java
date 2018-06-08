@@ -21,6 +21,7 @@ import java.util.*;
 import static com.flipkart.hbaseobjectmapper.testcases.util.LiteralsUtil.*;
 import static org.junit.Assert.*;
 
+@SuppressWarnings("unchecked")
 public class TestsAbstractHBDAO {
     private static Configuration configuration;
     private static HBaseCluster hBaseCluster;
@@ -74,10 +75,10 @@ public class TestsAbstractHBDAO {
                 CitizenDAO citizenDao = new CitizenDAO(configuration);
                 CitizenSummaryDAO citizenSummaryDAO = new CitizenSummaryDAO(configuration)
         ) {
-            assertEquals(citizenDao.getTableName(), "citizens");
+            assertEquals("citizens", citizenDao.getTableName());
             final Set<String> columnFamiliesCitizen = citizenDao.getColumnFamiliesAndVersions().keySet(), columnFamiliesCitizenSummary = citizenSummaryDAO.getColumnFamiliesAndVersions().keySet();
             assertEquals("Issue with column families of 'citizens' table\n" + columnFamiliesCitizen, s("main", "optional"), columnFamiliesCitizen);
-            assertEquals(citizenSummaryDAO.getTableName(), "citizens_summary");
+            assertEquals("citizens_summary", citizenSummaryDAO.getTableName());
             assertEquals("Issue with column families of 'citizens_summary' table\n" + columnFamiliesCitizenSummary, s("a"), columnFamiliesCitizenSummary);
             final List<Citizen> records = TestObjects.validCitizenObjects;
             String[] allRowKeys = new String[records.size()];
@@ -306,7 +307,7 @@ public class TestsAbstractHBDAO {
         try (
                 EmployeeDAO employeeDAO = new EmployeeDAO(configuration)
         ) {
-            Employee ePre = new Employee(100L, "E1", (short) 3);
+            Employee ePre = new Employee(100L, "E1", (short) 3, System.currentTimeMillis());
             Long rowKey = employeeDAO.persist(ePre);
             Employee ePost = employeeDAO.get(rowKey);
             assertEquals("Object got corrupted ", ePre, ePost);

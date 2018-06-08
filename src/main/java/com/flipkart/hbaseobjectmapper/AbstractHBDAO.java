@@ -74,6 +74,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         this.hbObjectMapper = hbObjectMapper;
         hbRecordClass = (Class<T>) new TypeToken<T>(getClass()) {
         }.getRawType();
+        this.hbObjectMapper.validateHBClass(hbRecordClass);
         rowKeyClass = (Class<R>) new TypeToken<R>(getClass()) {
         }.getRawType();
         if (hbRecordClass == null || rowKeyClass == null) {
@@ -82,7 +83,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         hbTable = new WrappedHBTable<>(hbRecordClass);
         connection = ConnectionFactory.createConnection(configuration);
         table = connection.getTable(hbTable.getName());
-        fields = hbObjectMapper.getHBColumnFields(hbRecordClass);
+        fields = hbObjectMapper.getHBColumnFields0(hbRecordClass);
     }
 
 

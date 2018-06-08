@@ -36,8 +36,8 @@ public class TestObjects {
     );
 
     public static final List<HBRecord> validEmployeeObjects = asList(
-            new Employee(1L, "Raja", (short) 0),
-            new Employee(2L, "Ramnik", (short) 8)
+            new Employee(1L, "Raja", (short) 0, System.currentTimeMillis()),
+            new Employee(2L, "Ramnik", (short) 8, System.currentTimeMillis())
     );
 
     public static final List<HBRecord> validStudentObjects = asList(
