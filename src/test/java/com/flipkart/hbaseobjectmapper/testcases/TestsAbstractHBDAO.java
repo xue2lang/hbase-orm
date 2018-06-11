@@ -29,15 +29,22 @@ public class TestsAbstractHBDAO {
     @BeforeClass
     public static void setup() {
         try {
-            String useRegularHBaseClient = System.getenv("USE_REGULAR_HBASE_CLIENT");
-            if (useRegularHBaseClient != null && (useRegularHBaseClient.equals("1") || useRegularHBaseClient.equalsIgnoreCase("true")))
+            String useRealHBase = System.getenv(RealHBaseCluster.USE_REAL_HBASE);
+            if (useRealHBase != null && (useRealHBase.equals("1") || useRealHBase.equalsIgnoreCase("true"))) {
                 hBaseCluster = new RealHBaseCluster();
-            else
-                hBaseCluster = new InMemoryHBaseCluster();
+            } else {
+                String inMemoryHBaseClusterStartTimeout = System.getenv(InMemoryHBaseCluster.INMEMORY_CLUSTER_START_TIMEOUT);
+                if (inMemoryHBaseClusterStartTimeout != null) {
+                    hBaseCluster = new InMemoryHBaseCluster(Long.parseLong(inMemoryHBaseClusterStartTimeout));
+                } else {
+                    hBaseCluster = new InMemoryHBaseCluster();
+                }
+            }
             configuration = hBaseCluster.init();
+        } catch (NumberFormatException e) {
+            fail("The environmental variable " + InMemoryHBaseCluster.INMEMORY_CLUSTER_START_TIMEOUT + " is specified incorrectly (Must be numeric)");
         } catch (Exception e) {
-            e.printStackTrace();
-            fail("Failed to connect to HBase. Aborted execution of DAO-related test cases");
+            fail("Failed to connect to HBase. Aborted execution of DAO-related test cases. Reason:\n" + e.getMessage());
         }
     }
 

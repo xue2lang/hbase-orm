@@ -175,7 +175,7 @@ public class TestHBObjectMapper {
             assertEquals("Validation for 'conversion to Result' and 'conversion to Put' differ in code path", exMsgObjToResult, exMsgObjToPut);
             assertEquals("Validation for 'conversion from Result' and 'conversion from Put' differ in code path", exMsgResultToObj, exMsgPutToObj);
             assertEquals("Validation for 'conversion from bean' and 'conversion to bean' differ in code path", exMsgObjToResult, exMsgResultToObj);
-            System.out.printf("%s threw below Exception as expected:%n%s%n%n", p.getValue1(), exMsgObjToResult);
+            System.out.printf("[edge case] %s threw below Exception, as expected:%n%s%n%n", p.getValue1(), exMsgObjToResult);
             assertTrue("Same error message for different invalid inputs", exceptionMessages.add(exMsgObjToPut));
         }
     }

@@ -257,18 +257,21 @@ Add below entry within the `dependencies` section of your `pom.xml`:
 See artifact details: [com.flipkart:hbase-object-mapper on **Maven Central**](http://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.flipkart%22%20AND%20a%3A%22hbase-object-mapper%22) or
 [com.flipkart:hbase-object-mapper on **MVN Repository**](https://mvnrepository.com/artifact/com.flipkart/hbase-object-mapper).
 ## How to build?
-To build this project, follow below steps:
+To build this project, follow below simple steps:
 
- * Do a `git clone` of this repository
- * Checkout latest stable version `git checkout v1.10`
- * Execute `mvn clean install` from shell
-
-Currently, projects that use this library are running on [Hortonworks Data Platform v2.4](https://hortonworks.com/blog/apache-hadoop-2-4-0-released/) (corresponds to Hadoop 2.7 and HBase 1.1). However, if you're using a different distribution of Hadoop (like [Cloudera](http://www.cloudera.com/)) or if you are using a different version of Hadoop, you may change the versions in [pom.xml](./pom.xml) to desired ones and build the project.
+ 1. Do a `git clone` of this repository
+ 2. Checkout latest stable version `git checkout v1.10`
+ 3. Execute `mvn clean install` from shell
 
 ### Please note
 
- * Test cases are very comprehensive - they even spin an [in-memory HBase test cluster](https://github.com/apache/hbase/blob/master/hbase-server/src/test/java/org/apache/hadoop/hbase/HBaseTestingUtility.java) to run data access related test cases (near-realworld scenario). So, build times can sometimes be longer, depending on your machine configuration.
- * Test cases check a lot of 'boundary conditions'. So you'll see a lot of stack traces. They are **not** failures.
+ * Currently, projects that use this library are running on [Hortonworks Data Platform v2.4](https://hortonworks.com/blog/apache-hadoop-2-4-0-released/) (corresponds to Hadoop 2.7 and HBase 1.1). However, if you're using a different distribution of Hadoop (like [Cloudera](http://www.cloudera.com/)) or if you are using a different version of Hadoop, you may change the versions in [pom.xml](./pom.xml) to desired ones and build the project.
+ * Test cases are very comprehensive. So, `mvn` build times can sometimes be longer, depending on your machine configuration.
+ * By default, test cases spin an [in-memory HBase test cluster](https://github.com/apache/hbase/blob/master/hbase-server/src/test/java/org/apache/hadoop/hbase/HBaseTestingUtility.java) to run data access related test cases (near-realworld scenario). 
+  * If test cases are failing with time out errors, you may increase the timeout by setting environment variable `INMEMORY_CLUSTER_START_TIMEOUT` (seconds). For example, on Linux you may run the command `INMEMORY_CLUSTER_START_TIMEOUT=8` on terminal, before running the aforementioned `mvn` command.
+ * You may direct test cases to use an actual HBase cluster (instead of default in-memory one) by setting `USE_REAL_HBASE` environmental variable to `true`.
+  * If you're using this option, ensure you've correct settings in your `hbase-site.xml`.
+ * Test cases check for a lot of 'boundary conditions'. So, you'll see a lot of exceptions in logs. They are **not** failures.
 
 ## Releases
 
