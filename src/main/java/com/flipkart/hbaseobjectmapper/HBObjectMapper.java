@@ -332,8 +332,9 @@ public class HBObjectMapper {
      * @param <R>    Data type of row key
      * @return HBase's {@link Put} object
      */
-    public <R extends Serializable & Comparable<R>> Put writeValueAsPut(HBRecord<R> record) {
-        validateHBClass(record.getClass());
+    @SuppressWarnings("unchecked")
+    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Put writeValueAsPut(HBRecord<R> record) {
+        validateHBClass((Class<T>) record.getClass());
         Put put = new Put(composeRowKey(record));
         for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : convertRecordToMap(record).entrySet()) {
             byte[] family = fe.getKey();
@@ -374,8 +375,9 @@ public class HBObjectMapper {
      * @param <R>    Data type of row key
      * @return HBase's {@link Result} object
      */
-    public <R extends Serializable & Comparable<R>> Result writeValueAsResult(HBRecord<R> record) {
-        validateHBClass(record.getClass());
+    @SuppressWarnings("unchecked")
+    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Result writeValueAsResult(HBRecord<R> record) {
+        validateHBClass((Class<T>) record.getClass());
         byte[] row = composeRowKey(record);
         List<Cell> cellList = new ArrayList<>();
         for (NavigableMap.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : convertRecordToMap(record).entrySet()) {
@@ -602,11 +604,12 @@ public class HBObjectMapper {
      * @return Serialised row key wrapped in {@link ImmutableBytesWritable}
      * @see #toIbw(Serializable)
      */
-    public <R extends Serializable & Comparable<R>> ImmutableBytesWritable getRowKey(HBRecord<R> record) {
+    @SuppressWarnings("unchecked")
+    public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> ImmutableBytesWritable getRowKey(HBRecord<R> record) {
         if (record == null) {
             throw new NullPointerException("Cannot compose row key for null objects");
         }
-        validateHBClass(record.getClass());
+        validateHBClass((Class<T>) record.getClass());
         return new ImmutableBytesWritable(composeRowKey(record));
     }
 
@@ -669,6 +672,7 @@ public class HBObjectMapper {
         return getHBColumnFields0(clazz);
     }
 
+    @SuppressWarnings("unchecked")
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Map<String, Field> getHBColumnFields0(Class<T> clazz) {
         Map<String, Field> mappings = new HashMap<>();
         Class thisClass = clazz;
