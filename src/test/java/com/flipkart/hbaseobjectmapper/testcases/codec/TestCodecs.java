@@ -2,6 +2,10 @@ package com.flipkart.hbaseobjectmapper.testcases.codec;
 
 
 import com.flipkart.hbaseobjectmapper.*;
+import com.flipkart.hbaseobjectmapper.annotations.Flag;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumn;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumnMultiVersion;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
 import com.flipkart.hbaseobjectmapper.codec.BestSuitCodec;
 import com.flipkart.hbaseobjectmapper.codec.Codec;
 import com.flipkart.hbaseobjectmapper.codec.JavaObjectStreamCodec;
@@ -64,7 +68,8 @@ public class TestCodecs {
                         }
                     } else {
                         Serializable fieldValue = (Serializable) field.get(record);
-                        verifyFieldSerDe(codec, objectClass.getSimpleName() + "." + fieldName, field.getGenericType(), fieldValue, toMap(field.getAnnotation(HBColumn.class).codecFlags()));
+                        verifyFieldSerDe(codec, objectClass.getSimpleName() + "." + fieldName, field.getGenericType(), fieldValue, toMap(field.getAnnotation(
+                            HBColumn.class).codecFlags()));
                     }
                 }
             }

@@ -1,6 +1,10 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
 import com.flipkart.hbaseobjectmapper.*;
+import com.flipkart.hbaseobjectmapper.annotations.Family;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumn;
+import com.flipkart.hbaseobjectmapper.annotations.HBRowKey;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
 
 public class ClassesWithInvalidHBTableAnnotation {
 

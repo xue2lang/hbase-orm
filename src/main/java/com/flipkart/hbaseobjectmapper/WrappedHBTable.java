@@ -1,5 +1,8 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.annotations.Family;
+import com.flipkart.hbaseobjectmapper.annotations.Flag;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
 import com.flipkart.hbaseobjectmapper.exceptions.DuplicateCodecFlagForRowKeyException;
 import com.flipkart.hbaseobjectmapper.exceptions.ImproperHBTableAnnotationExceptions;
 import org.apache.hadoop.hbase.TableName;
@@ -21,6 +24,10 @@ class WrappedHBTable<R extends Serializable & Comparable<R>, T extends HBRecord<
     private final Map<String, String> codecFlags;
     private final Class<T> clazz;
 
+    /**
+     * 提取实体类中的表的配置信息
+     * @param clazz 实体类的字节码
+     */
     WrappedHBTable(Class<T> clazz) {
         this.clazz = clazz;
         final HBTable hbTable = clazz.getAnnotation(HBTable.class);

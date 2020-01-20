@@ -1,7 +1,7 @@
 package com.flipkart.hbaseobjectmapper.exceptions;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBColumnMultiVersion;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumn;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumnMultiVersion;
 
 public class FieldNotMappedToHBaseColumnException extends IllegalArgumentException {
     public FieldNotMappedToHBaseColumnException(Class<?> hbRecordClass, String fieldName) {

@@ -1,19 +1,63 @@
 package com.flipkart.hbaseobjectmapper.testcases;
 
-import com.flipkart.hbaseobjectmapper.*;
-import com.flipkart.hbaseobjectmapper.exceptions.*;
-import com.flipkart.hbaseobjectmapper.testcases.entities.*;
+import static com.flipkart.hbaseobjectmapper.testcases.TestObjects.validObjects;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+import com.flipkart.hbaseobjectmapper.HBObjectMapper;
+import com.flipkart.hbaseobjectmapper.HBRecord;
+import com.flipkart.hbaseobjectmapper.annotations.Family;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumn;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumnMultiVersion;
+import com.flipkart.hbaseobjectmapper.annotations.HBRowKey;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
+import com.flipkart.hbaseobjectmapper.exceptions.EmptyConstructorInaccessibleException;
+import com.flipkart.hbaseobjectmapper.exceptions.FieldsMappedToSameColumnException;
+import com.flipkart.hbaseobjectmapper.exceptions.ImproperHBTableAnnotationExceptions;
+import com.flipkart.hbaseobjectmapper.exceptions.IncompatibleFieldForHBColumnMultiVersionAnnotationException;
+import com.flipkart.hbaseobjectmapper.exceptions.MappedColumnCantBePrimitiveException;
+import com.flipkart.hbaseobjectmapper.exceptions.MappedColumnCantBeStaticException;
+import com.flipkart.hbaseobjectmapper.exceptions.MappedColumnCantBeTransientException;
+import com.flipkart.hbaseobjectmapper.exceptions.MissingHBColumnFieldsException;
+import com.flipkart.hbaseobjectmapper.exceptions.MissingHBRowKeyFieldsException;
+import com.flipkart.hbaseobjectmapper.exceptions.NoEmptyConstructorException;
+import com.flipkart.hbaseobjectmapper.exceptions.ObjectNotInstantiatableException;
+import com.flipkart.hbaseobjectmapper.exceptions.RowKeyCantBeComposedException;
+import com.flipkart.hbaseobjectmapper.exceptions.RowKeyCantBeEmptyException;
+import com.flipkart.hbaseobjectmapper.exceptions.RowKeyCouldNotBeParsedException;
+import com.flipkart.hbaseobjectmapper.testcases.entities.Citizen;
+import com.flipkart.hbaseobjectmapper.testcases.entities.CitizenSummary;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassWithBadAnnotationStatic;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassWithBadAnnotationTransient;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassWithNoEmptyConstructor;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassWithNoHBColumns;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassWithNoHBRowKeys;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassWithPrimitives;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassWithTwoFieldsMappedToSameColumn;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassesWithFieldIncompatibleWithHBColumnMultiVersion;
+import com.flipkart.hbaseobjectmapper.testcases.entities.ClassesWithInvalidHBTableAnnotation;
+import com.flipkart.hbaseobjectmapper.testcases.entities.Crawl;
+import com.flipkart.hbaseobjectmapper.testcases.entities.CrawlNoVersion;
+import com.flipkart.hbaseobjectmapper.testcases.entities.Employee;
+import com.flipkart.hbaseobjectmapper.testcases.entities.EmployeeSummary;
+import com.flipkart.hbaseobjectmapper.testcases.entities.Singleton;
+import com.flipkart.hbaseobjectmapper.testcases.entities.UninstantiatableClass;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.NavigableMap;
+import java.util.Set;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.util.Triple;
 import org.junit.Test;
-
-import java.io.Serializable;
-import java.util.*;
-
-import static com.flipkart.hbaseobjectmapper.testcases.TestObjects.validObjects;
-import static org.junit.Assert.*;
 
 @SuppressWarnings("unchecked")
 public class TestHBObjectMapper {
@@ -51,9 +95,13 @@ public class TestHBObjectMapper {
     public void testHBObjectMapper() {
         for (HBRecord obj : validObjects) {
             System.out.printf("Original object: %s%n", obj);
+            //测试序列化、反序列化耗时
             testResult(obj);
+            //测试行数据 序列化、反序列化
             testResultWithRow(obj);
+            //测试put数据 序列化、反序列化
             testPut(obj);
+            //测试put行数据 序列化、反序列化
             testPutWithRow(obj);
             System.out.printf("*****%n%n");
         }

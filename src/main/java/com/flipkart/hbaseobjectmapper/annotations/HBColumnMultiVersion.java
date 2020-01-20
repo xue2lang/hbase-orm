@@ -1,4 +1,4 @@
-package com.flipkart.hbaseobjectmapper;
+package com.flipkart.hbaseobjectmapper.annotations;
 
 import com.flipkart.hbaseobjectmapper.codec.Codec;
 
@@ -12,11 +12,15 @@ import static java.lang.annotation.ElementType.FIELD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Maps an entity field to an HBase column
+ * Maps an entity field of type <code>NavigableMap&lt;Long, T&gt;</code> to an HBase column whose data type is represented as data type <code>T</code>.
+ * <p>
+ * As the name explains, this annotation is the multi-version variant of {@link HBColumn}.
+ * <p>
+ * <b>Please note</b>: <code>T</code> must be {@link Serializable}
  */
 @Target(FIELD)
 @Retention(RUNTIME)
-public @interface HBColumn {
+public @interface HBColumnMultiVersion {
 
     /**
      * Name of HBase column family
@@ -40,4 +44,5 @@ public @interface HBColumn {
      * @return Flags
      */
     Flag[] codecFlags() default {};
+
 }

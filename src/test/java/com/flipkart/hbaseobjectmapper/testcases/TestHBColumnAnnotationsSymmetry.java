@@ -1,16 +1,15 @@
 package com.flipkart.hbaseobjectmapper.testcases;
 
-import com.flipkart.hbaseobjectmapper.HBColumn;
-import com.flipkart.hbaseobjectmapper.HBColumnMultiVersion;
-import org.junit.Test;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
 
+import com.flipkart.hbaseobjectmapper.annotations.HBColumn;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumnMultiVersion;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Comparator;
-
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
+import org.junit.Test;
 
 /**
  * This test case makes sure that annotations {@link HBColumn} and {@link HBColumnMultiVersion} are structurally same.

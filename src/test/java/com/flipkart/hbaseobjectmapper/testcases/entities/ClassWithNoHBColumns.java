@@ -1,9 +1,9 @@
 package com.flipkart.hbaseobjectmapper.testcases.entities;
 
-import com.flipkart.hbaseobjectmapper.Family;
+import com.flipkart.hbaseobjectmapper.annotations.Family;
 import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBRowKey;
-import com.flipkart.hbaseobjectmapper.HBTable;
+import com.flipkart.hbaseobjectmapper.annotations.HBRowKey;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
 
 @SuppressWarnings("unused")
 @HBTable(name = "blah", families = {@Family(name = "a")})

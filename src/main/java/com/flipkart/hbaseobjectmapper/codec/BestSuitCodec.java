@@ -3,7 +3,7 @@ package com.flipkart.hbaseobjectmapper.codec;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.flipkart.hbaseobjectmapper.Flag;
+import com.flipkart.hbaseobjectmapper.annotations.Flag;
 import com.flipkart.hbaseobjectmapper.codec.exceptions.DeserializationException;
 import com.flipkart.hbaseobjectmapper.codec.exceptions.SerializationException;
 import com.flipkart.hbaseobjectmapper.exceptions.BadHBaseLibStateException;
@@ -166,11 +166,13 @@ public class BestSuitCodec implements Codec {
 
     }
 
-    /*
+    /**
+     * 是否可以序列化
      * @inherit
      */
     @Override
     public boolean canDeserialize(Type type) {
+        //构造类型
         JavaType javaType = objectMapper.constructType(type);
         return objectMapper.canDeserialize(javaType);
     }

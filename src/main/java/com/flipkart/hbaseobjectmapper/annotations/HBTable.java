@@ -1,4 +1,4 @@
-package com.flipkart.hbaseobjectmapper;
+package com.flipkart.hbaseobjectmapper.annotations;
 
 import com.flipkart.hbaseobjectmapper.codec.Codec;
 

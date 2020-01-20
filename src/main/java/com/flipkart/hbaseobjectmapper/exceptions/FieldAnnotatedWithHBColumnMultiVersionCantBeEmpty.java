@@ -1,6 +1,6 @@
 package com.flipkart.hbaseobjectmapper.exceptions;
 
-import com.flipkart.hbaseobjectmapper.HBColumnMultiVersion;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumnMultiVersion;
 
 public class FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty extends IllegalArgumentException {
     public FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty() {

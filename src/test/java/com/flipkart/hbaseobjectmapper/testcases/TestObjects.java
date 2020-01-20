@@ -1,6 +1,6 @@
 package com.flipkart.hbaseobjectmapper.testcases;
 
-import com.flipkart.hbaseobjectmapper.HBColumnMultiVersion;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumnMultiVersion;
 import com.flipkart.hbaseobjectmapper.HBRecord;
 import com.flipkart.hbaseobjectmapper.exceptions.AllHBColumnFieldsNullException;
 import com.flipkart.hbaseobjectmapper.exceptions.FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty;

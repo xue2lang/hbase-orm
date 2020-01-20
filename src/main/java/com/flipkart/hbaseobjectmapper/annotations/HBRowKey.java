@@ -1,5 +1,6 @@
-package com.flipkart.hbaseobjectmapper;
+package com.flipkart.hbaseobjectmapper.annotations;
 
+import com.flipkart.hbaseobjectmapper.HBRecord;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 

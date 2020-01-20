@@ -1,5 +1,8 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.annotations.HBRowKey;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
+import com.flipkart.hbaseobjectmapper.annotations.MappedSuperClass;
 import com.flipkart.hbaseobjectmapper.codec.BestSuitCodec;
 import com.flipkart.hbaseobjectmapper.codec.Codec;
 import com.flipkart.hbaseobjectmapper.codec.exceptions.DeserializationException;
@@ -150,38 +153,56 @@ public class HBObjectMapper {
         return new ImmutableBytesWritable(valueToByteArray(value, null));
     }
 
+    /**
+     * 获取表的信息（返回包装类）
+     * @param clazz 实体类
+     * @param <R> 行
+     * @param <T> 返回值
+     * @return
+     */
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> WrappedHBTable<R, T> validateHBClass(Class<T> clazz) {
         Constructor<?> constructor;
         try {
+            //获取无参构造
             constructor = clazz.getDeclaredConstructor();
         } catch (NoSuchMethodException e) {
             throw new NoEmptyConstructorException(clazz, e);
         }
+        //判断是否私有
         if (!Modifier.isPublic(constructor.getModifiers())) {
             throw new EmptyConstructorInaccessibleException(String.format("Empty constructor of class %s is inaccessible. It needs to be public.", clazz.getName()));
         }
         int numOfHBColumns = 0, numOfHBRowKeys = 0;
+        //表的包装类
         WrappedHBTable<R, T> hbTable = new WrappedHBTable<>(clazz);
+        //获取属性（绑定列族、列的唯一标识）
         Set<FamilyAndColumn> columns = new HashSet<>(clazz.getDeclaredFields().length, 1.0f);
         for (Field field : clazz.getDeclaredFields()) {
+            //rowKey信息
             if (field.isAnnotationPresent(HBRowKey.class)) {
                 numOfHBRowKeys++;
             }
         }
+        //实体类必须含有rowKey，否则抛出异常
         if (numOfHBRowKeys == 0) {
             throw new MissingHBRowKeyFieldsException(clazz);
         }
         Map<String, Field> hbColumnFields = getHBColumnFields0(clazz);
         for (Field field : hbColumnFields.values()) {
+            //获取属性的包装对象
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+            //存在版本信息
             if (hbColumn.isPresent()) {
+                //判断是否配置表的列族信息
                 if (!hbTable.isColumnFamilyPresent(hbColumn.family())) {
                     throw new IllegalArgumentException(String.format("Class %s has field '%s' mapped to HBase column '%s' - but column family '%s' isn't configured in @%s annotation",
                             clazz.getName(), field.getName(), hbColumn, hbColumn.family(), HBTable.class.getSimpleName()));
                 }
+                //单版本
                 if (hbColumn.isSingleVersioned()) {
                     validateHBColumnSingleVersionField(field);
                 } else if (hbColumn.isMultiVersioned()) {
+                    //多版本
                     validateHBColumnMultiVersionField(field);
                 }
                 if (!columns.add(new FamilyAndColumn(hbColumn.family(), hbColumn.column()))) {
@@ -221,6 +242,7 @@ public class HBObjectMapper {
      * Internal note: For multi-version usecase, this should be in sync with {@link #validateHBColumnMultiVersionField(Field)}
      */
     Type getFieldType(Field field, boolean isMultiVersioned) {
+        //多版本
         if (isMultiVersioned) {
             return ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1];
         } else {
@@ -228,8 +250,14 @@ public class HBObjectMapper {
         }
     }
 
+    /**
+     * 校验单版本属性
+     * @param field
+     */
     private void validateHBColumnSingleVersionField(Field field) {
+        //校验属性
         validateHBColumnField(field);
+        //获取属性泛型类型
         Type fieldType = getFieldType(field, false);
         if (fieldType instanceof Class) {
             Class<?> fieldClazz = (Class<?>) fieldType;
@@ -237,11 +265,16 @@ public class HBObjectMapper {
                 throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable)", field.getName(), field.getDeclaringClass().getName(), fieldClazz.getName()));
             }
         }
+        //是否支持序列化
         if (!codec.canDeserialize(fieldType)) {
             throw new UnsupportedFieldTypeException(String.format("Field %s in class %s is of unsupported type (%s)", field.getName(), field.getDeclaringClass().getName(), fieldType));
         }
     }
 
+    /**
+     * 校验列属性（标注@HBColumn 注解的属性，不能使用 transient、static修饰），否则抛出异常
+     * @param field
+     */
     private void validateHBColumnField(Field field) {
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
         int modifiers = field.getModifiers();
@@ -261,13 +294,18 @@ public class HBObjectMapper {
     @SuppressWarnings("unchecked")
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> convertRecordToMap(HBRecord<R> record) {
         Class<T> clazz = (Class<T>) record.getClass();
+        //得到所有的属性
         Collection<Field> fields = getHBColumnFields0(clazz).values();
+        //排序
         NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<>(Bytes.BYTES_COMPARATOR);
         int numOfFieldsToWrite = 0;
         for (Field field : fields) {
+            //列属性
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+            //单版本
             if (hbColumn.isSingleVersioned()) {
-                byte[] familyName = hbColumn.familyBytes(), columnName = hbColumn.columnBytes();
+                byte[] familyName = hbColumn.familyBytes();
+                byte[] columnName = hbColumn.columnBytes();
                 if (!map.containsKey(familyName)) {
                     map.put(familyName, new TreeMap<>(Bytes.BYTES_COMPARATOR));
                 }
@@ -282,8 +320,9 @@ public class HBObjectMapper {
                 numOfFieldsToWrite++;
             } else if (hbColumn.isMultiVersioned()) {
                 NavigableMap<Long, byte[]> fieldValueVersions = getFieldValuesAsNavigableMapOfBytes(record, field, hbColumn.codecFlags());
-                if (fieldValueVersions == null)
+                if (fieldValueVersions == null){
                     continue;
+                }
                 byte[] familyName = hbColumn.familyBytes(), columnName = hbColumn.columnBytes();
                 if (!map.containsKey(familyName)) {
                     map.put(familyName, new TreeMap<>(Bytes.BYTES_COMPARATOR));
@@ -315,8 +354,9 @@ public class HBObjectMapper {
             field.setAccessible(true);
             @SuppressWarnings("unchecked")
             NavigableMap<Long, R> fieldValueVersions = (NavigableMap<Long, R>) field.get(record);
-            if (fieldValueVersions == null)
+            if (fieldValueVersions == null){
                 return null;
+            }
             if (fieldValueVersions.size() == 0) {
                 throw new FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty();
             }
@@ -324,8 +364,9 @@ public class HBObjectMapper {
             for (Map.Entry<Long, R> e : fieldValueVersions.entrySet()) {
                 Long timestamp = e.getKey();
                 R fieldValue = e.getValue();
-                if (fieldValue == null)
+                if (fieldValue == null){
                     continue;
+                }
                 byte[] fieldValueBytes = valueToByteArray(fieldValue, codecFlags);
                 output.put(timestamp, fieldValueBytes);
             }
@@ -347,14 +388,17 @@ public class HBObjectMapper {
     @SuppressWarnings("unchecked")
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Put writeValueAsPut(HBRecord<R> record) {
         validateHBClass((Class<T>) record.getClass());
+        //创建put实例
         Put put = new Put(composeRowKey(record));
         for (Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : convertRecordToMap(record).entrySet()) {
             byte[] family = fe.getKey();
             for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
                 byte[] columnName = e.getKey();
                 NavigableMap<Long, byte[]> columnValuesVersioned = e.getValue();
-                if (columnValuesVersioned == null)
+                if (columnValuesVersioned == null){
                     continue;
+                }
+                //返回列信息
                 for (Map.Entry<Long, byte[]> versionAndValue : columnValuesVersioned.entrySet()) {
                     put.addColumn(family, columnName, versionAndValue.getKey(), versionAndValue.getValue());
                 }
@@ -398,8 +442,9 @@ public class HBObjectMapper {
             for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
                 byte[] columnName = e.getKey();
                 NavigableMap<Long, byte[]> valuesVersioned = e.getValue();
-                if (valuesVersioned == null)
+                if (valuesVersioned == null){
                     continue;
+                }
                 for (Map.Entry<Long, byte[]> columnVersion : valuesVersioned.entrySet()) {
                     CellBuilder cellBuilder = CellBuilderFactory.create(CellBuilderType.DEEP_COPY);
                     cellBuilder.setType(Cell.Type.Put).setRow(row).setFamily(family).setQualifier(columnName).setTimestamp(columnVersion.getKey()).setValue(columnVersion.getValue());
@@ -441,10 +486,10 @@ public class HBObjectMapper {
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(ImmutableBytesWritable rowKey, Result result, Class<T> clazz) {
         validateHBClass(clazz);
-        if (rowKey == null)
+        if (rowKey == null){
             return readValueFromResult(result, clazz);
-        else
-            return readValueFromRowAndResult(rowKey.get(), result, clazz);
+        }
+        return readValueFromRowAndResult(rowKey.get(), result, clazz);
     }
 
     /**
@@ -463,10 +508,10 @@ public class HBObjectMapper {
     }
 
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Result result, Class<T> clazz) {
-        if (rowKey == null)
+        if (rowKey == null){
             return readValueFromResult(result, clazz);
-        else
-            return readValueFromRowAndResult(rowKeyToBytes(rowKey, WrappedHBTable.getCodecFlags(clazz)), result, clazz);
+        }
+        return readValueFromRowAndResult(rowKeyToBytes(rowKey, WrappedHBTable.getCodecFlags(clazz)), result, clazz);
     }
 
     private boolean isResultEmpty(Result result) {
@@ -474,7 +519,9 @@ public class HBObjectMapper {
     }
 
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValueFromResult(Result result, Class<T> clazz) {
-        if (isResultEmpty(result)) return null;
+        if (isResultEmpty(result)){
+            return null;
+        }
         return convertMapToRecord(result.getRow(), result.getMap(), clazz);
     }
 
@@ -486,8 +533,9 @@ public class HBObjectMapper {
     }
 
     private void objectSetFieldValue(Object obj, Field field, NavigableMap<Long, byte[]> columnValuesVersioned, Map<String, String> codecFlags) {
-        if (columnValuesVersioned == null)
+        if (columnValuesVersioned == null){
             return;
+        }
         try {
             field.setAccessible(true);
             NavigableMap<Long, Object> columnValuesVersionedBoxed = new TreeMap<>();
@@ -501,8 +549,9 @@ public class HBObjectMapper {
     }
 
     private void objectSetFieldValue(Object obj, Field field, byte[] value, Map<String, String> codecFlags) {
-        if (value == null || value.length == 0)
+        if (value == null || value.length == 0){
             return;
+        }
         try {
             field.setAccessible(true);
             field.set(obj, byteArrayToValue(value, field.getGenericType(), codecFlags));
@@ -519,10 +568,10 @@ public class HBObjectMapper {
      */
     Object byteArrayToValue(byte[] value, Type type, Map<String, String> codecFlags) {
         try {
-            if (value == null || value.length == 0)
+            if (value == null || value.length == 0){
                 return null;
-            else
-                return codec.deserialize(value, type, codecFlags);
+            }
+            return codec.deserialize(value, type, codecFlags);
         } catch (DeserializationException e) {
             throw new CodecException("Error while deserializing", e);
         }
@@ -542,10 +591,10 @@ public class HBObjectMapper {
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(ImmutableBytesWritable rowKey, Put put, Class<T> clazz) {
         validateHBClass(clazz);
-        if (rowKey == null)
+        if (rowKey == null){
             return readValueFromPut(put, clazz);
-        else
-            return readValueFromRowAndPut(rowKey.get(), put, clazz);
+        }
+       return readValueFromRowAndPut(rowKey.get(), put, clazz);
     }
 
 
@@ -563,9 +612,9 @@ public class HBObjectMapper {
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Put put, Class<T> clazz) {
         if (rowKey == null) {
             return readValueFromPut(put, clazz);
-        } else {
-            return readValueFromRowAndPut(rowKeyToBytes(rowKey, WrappedHBTable.getCodecFlags(clazz)), put, clazz);
         }
+        return readValueFromRowAndPut(rowKeyToBytes(rowKey, WrappedHBTable.getCodecFlags(clazz)), put, clazz);
+
     }
 
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValueFromRowAndPut(byte[] rowKeyBytes, Put put, Class<T> clazz) {
@@ -633,6 +682,13 @@ public class HBObjectMapper {
         return new ImmutableBytesWritable(composeRowKey(record));
     }
 
+    /**
+     * 获取rowKey
+     * @param record
+     * @param <R>
+     * @param <T>
+     * @return
+     */
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> byte[] composeRowKey(HBRecord<R> record) {
         R rowKey;
         try {
@@ -692,11 +748,20 @@ public class HBObjectMapper {
         return getHBColumnFields0(clazz);
     }
 
+    /**
+     * 获取列族和唯一标识
+     * @param clazz 类字节码
+     * @param <R> rowKey
+     * @param <T> 返回值
+     * @return key-列唯一标识，value-属性
+     */
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Map<String, Field> getHBColumnFields0(Class<T> clazz) {
         Map<String, Field> mappings = new LinkedHashMap<>();
         Class<?> thisClass = clazz;
+        //递归获取所有的属性（包括父类）
         while (thisClass != null && thisClass != Object.class) {
             for (Field field : thisClass.getDeclaredFields()) {
+                //版本信息是否存在
                 if (new WrappedHBColumn(field).isPresent()) {
                     mappings.put(field.getName(), field);
                 }

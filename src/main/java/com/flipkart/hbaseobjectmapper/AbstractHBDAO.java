@@ -1,5 +1,6 @@
 package com.flipkart.hbaseobjectmapper;
 
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
 import com.flipkart.hbaseobjectmapper.codec.Codec;
 import com.google.common.reflect.TypeToken;
 import org.apache.hadoop.conf.Configuration;

@@ -2,6 +2,10 @@ package com.flipkart.hbaseobjectmapper.testcases.entities;
 
 import com.flipkart.hbaseobjectmapper.*;
 
+import com.flipkart.hbaseobjectmapper.annotations.Family;
+import com.flipkart.hbaseobjectmapper.annotations.HBColumnMultiVersion;
+import com.flipkart.hbaseobjectmapper.annotations.HBRowKey;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
 import java.util.Map;
 import java.util.NavigableMap;
 

@@ -1,7 +1,7 @@
 package com.flipkart.hbaseobjectmapper.exceptions;
 
 import com.flipkart.hbaseobjectmapper.HBRecord;
-import com.flipkart.hbaseobjectmapper.HBTable;
+import com.flipkart.hbaseobjectmapper.annotations.HBTable;
 
 import java.io.Serializable;
 

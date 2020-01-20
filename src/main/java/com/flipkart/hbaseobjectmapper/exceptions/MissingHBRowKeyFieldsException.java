@@ -1,6 +1,6 @@
 package com.flipkart.hbaseobjectmapper.exceptions;
 
-import com.flipkart.hbaseobjectmapper.HBRowKey;
+import com.flipkart.hbaseobjectmapper.annotations.HBRowKey;
 
 public class MissingHBRowKeyFieldsException extends IllegalArgumentException {
     public MissingHBRowKeyFieldsException(Class<?> clazz) {
