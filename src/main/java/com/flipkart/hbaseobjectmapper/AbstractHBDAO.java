@@ -137,6 +137,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public T get(R rowKey, int numVersionsToFetch) throws IOException {
+        //循环
         try (Table table = getHBaseTable()) {
             Result result = table.get(new Get(toBytes(rowKey)).readVersions(numVersionsToFetch));
             return hbObjectMapper.readValue(rowKey, result, hbRecordClass);
@@ -151,6 +152,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public T get(R rowKey) throws IOException {
+        //版本号在注解@Family已默认为1，所以取值时也默认为1
         return get(rowKey, 1);
     }
 
@@ -190,6 +192,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
     public List<T> getOnGets(List<Get> gets) throws IOException {
         List<T> records = new ArrayList<>(gets.size());
         try (Table table = getHBaseTable()) {
+            //批量获取
             Result[] results = table.get(gets);
             for (Result result : results) {
                 records.add(hbObjectMapper.readValue(result, hbRecordClass));
@@ -243,9 +246,11 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      */
     public List<T> get(List<R> rowKeys, int numVersionsToFetch) throws IOException {
         List<Get> gets = new ArrayList<>(rowKeys.size());
+        //封装多个rowKey
         for (R rowKey : rowKeys) {
             gets.add(new Get(toBytes(rowKey)).readVersions(numVersionsToFetch));
         }
+        //获取
         List<T> records = new ArrayList<>(rowKeys.size());
         try (Table table = getHBaseTable()) {
             Result[] results = table.get(gets);
@@ -264,6 +269,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public List<T> get(List<R> rowKeys) throws IOException {
+        //默认版本号为1
         return get(rowKeys, 1);
     }
 
@@ -281,6 +287,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public List<T> get(R startRowKey, R endRowKey, int numVersionsToFetch) throws IOException {
+        //封装Scan入参，默认查询行区间为 左闭右闭
         Scan scan = new Scan()
                 .withStartRow(toBytes(startRowKey))
                 .withStopRow(toBytes(endRowKey))
@@ -302,6 +309,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public List<T> get(R startRowKey, boolean startRowInclusive, R endRowKey, boolean endRowInclusive, int numVersionsToFetch) throws IOException {
+        //封装Scan入参
         Scan scan = new Scan()
                 .withStartRow(toBytes(startRowKey), startRowInclusive)
                 .withStopRow(toBytes(endRowKey), endRowInclusive)
@@ -470,6 +478,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public long increment(R rowKey, String fieldName, long amount) throws IOException {
+        //获取包装类
         WrappedHBColumn hbColumn = validateAndGetLongColumn(fieldName);
         try (Table table = getHBaseTable()) {
             return table.incrementColumnValue(toBytes(rowKey), hbColumn.familyBytes(), hbColumn.columnBytes(), amount);
@@ -554,7 +563,8 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @see #append(Serializable, String, Object)
      */
     public T append(R rowKey, Map<String, Object> valuesToAppend) throws IOException {
-        Append append = new Append(toBytes(rowKey));
+        //创建Append对象，并封装相关信息
+        Append append = getAppend(rowKey);
         for (Map.Entry<String, Object> e : valuesToAppend.entrySet()) {
             String fieldName = e.getKey();
             Field field = getField(fieldName);
@@ -567,10 +577,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
                     hbObjectMapper.valueToByteArray((Serializable) value, hbColumn.codecFlags())
             );
         }
-        try (Table table = getHBaseTable()) {
-            Result result = table.append(append);
-            return hbObjectMapper.readValue(result, hbRecordClass);
-        }
+        return append(append);
     }
 
 
@@ -759,8 +766,10 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         WrappedHBColumn hbColumn = new WrappedHBColumn(field, true);
         List<Cell> cells = result.getColumnCells(hbColumn.familyBytes(), hbColumn.columnBytes());
         for (Cell cell : cells) {
+            //获取属性对应的类型
             Type fieldType = hbObjectMapper.getFieldType(field, hbColumn.isMultiVersioned());
-            @SuppressWarnings("unchecked") final R rowKey = hbObjectMapper.bytesToRowKey(CellUtil.cloneRow(cell), hbTable.getCodecFlags(), (Class<T>) field.getDeclaringClass());
+            @SuppressWarnings("unchecked")
+            final R rowKey = hbObjectMapper.bytesToRowKey(CellUtil.cloneRow(cell), hbTable.getCodecFlags(), (Class<T>) field.getDeclaringClass());
             if (!map.containsKey(rowKey)) {
                 map.put(rowKey, new TreeMap<>());
             }
@@ -781,6 +790,7 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
         if (fieldValues == null || fieldValues.isEmpty()) {
             return null;
         } else {
+            //获取最新值
             return fieldValues.lastEntry().getValue();
         }
     }
@@ -796,7 +806,8 @@ public abstract class AbstractHBDAO<R extends Serializable & Comparable<R>, T ex
      * @throws IOException When HBase call fails
      */
     public NavigableMap<Long, Object> fetchFieldValue(R rowKey, String fieldName, int numVersionsToFetch) throws IOException {
-        @SuppressWarnings("unchecked") R[] array = (R[]) Array.newInstance(rowKeyClass, 1);
+        @SuppressWarnings("unchecked")
+        R[] array = (R[]) Array.newInstance(rowKeyClass, 1);
         array[0] = rowKey;
         return fetchFieldValues(array, fieldName, numVersionsToFetch).get(rowKey);
 

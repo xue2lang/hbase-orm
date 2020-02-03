@@ -37,6 +37,9 @@ import java.util.Map;
 public class BestSuitCodec implements Codec {
     public static final String SERIALIZE_AS_STRING = "serializeAsString";
 
+    /**
+     * 包装类型->基本类型 (由于属性都定义为包装类型，但在Bytes类中，将byte[]映射为属性时，映射后的都是基本数据类型，因此定义将byte[]映射为属性的方法，同时涉及到基本属性的向上转型为包装类型)
+     */
     private static final Map<Class<?>, String> fromBytesMethodNames = ImmutableMap.<Class<?>, String>builder()
             .put(Boolean.class, "toBoolean")
             .put(Short.class, "toShort")
@@ -48,6 +51,9 @@ public class BestSuitCodec implements Codec {
             .put(BigDecimal.class, "toBigDecimal")
             .build();
 
+    /**
+     * 包装类型->基本类型 (由于属性都定义为包装类型，但在Bytes类中，将属性映射为byte[]，操作的都是基础数据类型，因此定义两者之间的关系)
+     */
     private static final Map<Class<?>, Class<?>> nativeCounterParts = ImmutableMap.<Class<?>, Class<?>>builder()
             .put(Boolean.class, boolean.class)
             .put(Short.class, short.class)
@@ -68,9 +74,14 @@ public class BestSuitCodec implements Codec {
             for (Map.Entry<Class<?>, String> e : fromBytesMethodNames.entrySet()) {
                 Class<?> clazz = e.getKey();
                 String toDataTypeMethodName = e.getValue();
+
+                //获取Bytes类中将byte数组映射为各类型的方法，如：Bytes类中将bytes[]数组转化为double类型 public static double toDouble(byte[] bytes)
                 Method fromBytesMethod = Bytes.class.getDeclaredMethod(toDataTypeMethodName, byte[].class);
+                //获取Bytes类中各类型对应的toBytes方法，如：Bytes类中将double类型映射为byte[]数组的方法 public static byte[] toBytes(double d)
                 Method toBytesMethod = Bytes.class.getDeclaredMethod("toBytes", nativeCounterParts.getOrDefault(clazz, clazz));
+                //获取各属性类型对应的字符串构造函数，如：Double类中的字符串参数类型对应的构造函数 public Double(String s)
                 Constructor<?> constructor = clazz.getConstructor(String.class);
+
                 fromBytesMethods.put(clazz, fromBytesMethod);
                 toBytesMethods.put(clazz, toBytesMethod);
                 constructors.put(clazz, constructor);
@@ -106,7 +117,7 @@ public class BestSuitCodec implements Codec {
         return objectMapper;
     }
 
-    /*
+    /**
      * @inherit
      */
     @Override
@@ -115,6 +126,7 @@ public class BestSuitCodec implements Codec {
             return null;
         }
         Class<?> clazz = object.getClass();
+        //转化为byte的方法是否包含此类
         if (toBytesMethods.containsKey(clazz)) {
             boolean serializeAsString = isSerializeAsStringTrue(flags);
             try {
@@ -124,6 +136,7 @@ public class BestSuitCodec implements Codec {
                 throw new SerializationException(String.format("Could not serialize value of type %s using HBase's native methods", clazz.getName()), e);
             }
         } else {
+            //其他类型使用fastJson转化为byte数组，如：属性类型为 List对象
             try {
                 return objectMapper.writeValueAsBytes(object);
             } catch (Exception e) {
@@ -132,7 +145,7 @@ public class BestSuitCodec implements Codec {
         }
     }
 
-    /*
+    /**
      * @inherit
      */
     @Override

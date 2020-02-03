@@ -75,6 +75,15 @@ public class HBObjectMapper {
         return valueToByteArray(rowKey, codecFlags);
     }
 
+    /**
+     * 行键的反序列化
+     * @param rowKeyBytes 行键对应的byte[]
+     * @param codecFlags  编码
+     * @param entityClass 实体类
+     * @param <R> 行键泛型
+     * @param <T> 实体类泛型
+     * @return
+     */
     @SuppressWarnings("unchecked")
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> R bytesToRowKey(byte[] rowKeyBytes, Map<String, String> codecFlags, Class<T> entityClass) {
         try {
@@ -90,35 +99,46 @@ public class HBObjectMapper {
      * @see #convertRecordToMap(HBRecord)
      */
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T convertMapToRecord(byte[] rowKeyBytes, NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map, Class<T> clazz) {
+        //获取实体类所有属性
         Collection<Field> fields = getHBColumnFields0(clazz).values();
+        //表包装类：将实体类进行包装
         WrappedHBTable<R, T> hbTable = new WrappedHBTable<>(clazz);
+        //行键
         R rowKey = bytesToRowKey(rowKeyBytes, hbTable.getCodecFlags(), clazz);
         T record;
         try {
+            //实例化Entity
             record = clazz.getDeclaredConstructor()
                     .newInstance();
         } catch (Exception ex) {
             throw new ObjectNotInstantiatableException("Error while instantiating empty constructor of " + clazz.getName(), ex);
         }
         try {
+            //获取行键
             record.parseRowKey(rowKey);
         } catch (Exception ex) {
             throw new RowKeyCouldNotBeParsedException(String.format("Supplied row key \"%s\" could not be parsed", rowKey), ex);
         }
         for (Field field : fields) {
+            //属性包装类：将Entity中Field进行映射
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+            //列族
             NavigableMap<byte[], NavigableMap<Long, byte[]>> familyMap = map.get(hbColumn.familyBytes());
             if (familyMap == null || familyMap.isEmpty()) {
                 continue;
             }
             NavigableMap<Long, byte[]> columnVersionsMap = familyMap.get(hbColumn.columnBytes());
+            //判断该Entity是否单版本属性（即只取一个版本的数据）
             if (hbColumn.isSingleVersioned()) {
                 if (columnVersionsMap == null || columnVersionsMap.isEmpty()) {
                     continue;
                 }
+                //当该行存在多版本时，只取出该行的最新数据（内部Map已排序）
                 Map.Entry<Long, byte[]> lastEntry = columnVersionsMap.lastEntry();
+
                 objectSetFieldValue(record, field, lastEntry.getValue(), hbColumn.codecFlags());
             } else {
+                //多版本，取出所有的数据，并封装到Map
                 objectSetFieldValue(record, field, columnVersionsMap, hbColumn.codecFlags());
             }
         }
@@ -135,6 +155,7 @@ public class HBObjectMapper {
      */
     byte[] valueToByteArray(Serializable value, Map<String, String> codecFlags) {
         try {
+            //序列化
             return codec.serialize(value, codecFlags);
         } catch (SerializationException e) {
             throw new CodecException("Couldn't serialize", e);
@@ -221,31 +242,39 @@ public class HBObjectMapper {
      * Internal note: This should be in sync with {@link #getFieldType(Field, boolean)}
      */
     private void validateHBColumnMultiVersionField(Field field) {
+        //校验
         validateHBColumnField(field);
         if (!(field.getGenericType() instanceof ParameterizedType)) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException(String.format("Field %s is not even a parameterized type", field));
         }
+        //多版本类型必须为NavigableMap类型
         if (field.getType() != NavigableMap.class) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException(String.format("Field %s is not a NavigableMap", field));
         }
+        //泛型类型
         ParameterizedType pType = (ParameterizedType) field.getGenericType();
+        //获取NavigableMap中两个泛型类型
         Type[] typeArguments = pType.getActualTypeArguments();
+        //NavigableMap必须包装key为Long类型（时间戳）
         if (typeArguments.length != 2 || typeArguments[0] != Long.class) {
             throw new IncompatibleFieldForHBColumnMultiVersionAnnotationException(String.format("Field %s has unexpected type params (Key should be of %s type)", field, Long.class.getName()));
         }
+        //判断属性是否可序列化
         if (!codec.canDeserialize(getFieldType(field, true))) {
             throw new UnsupportedFieldTypeException(String.format("Field %s in class %s is of unsupported type Navigable<Long,%s> ", field.getName(), field.getDeclaringClass().getName(), field.getDeclaringClass().getName()));
         }
     }
 
     /**
+     * 获取Field属性的类型
      * Internal note: For multi-version usecase, this should be in sync with {@link #validateHBColumnMultiVersionField(Field)}
      */
     Type getFieldType(Field field, boolean isMultiVersioned) {
-        //多版本
+        //多版本，取值 NavigableMap value对应的属性类型
         if (isMultiVersioned) {
             return ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1];
         } else {
+            //版本
             return field.getGenericType();
         }
     }
@@ -257,10 +286,11 @@ public class HBObjectMapper {
     private void validateHBColumnSingleVersionField(Field field) {
         //校验属性
         validateHBColumnField(field);
-        //获取属性泛型类型
+        //获取属性类型
         Type fieldType = getFieldType(field, false);
         if (fieldType instanceof Class) {
             Class<?> fieldClazz = (Class<?>) fieldType;
+            //判断是否为基础数据类型（所有的属性定义不可以为基础数据类型）
             if (fieldClazz.isPrimitive()) {
                 throw new MappedColumnCantBePrimitiveException(String.format("Field %s in class %s is a primitive of type %s (Primitive data types are not supported as they're not nullable)", field.getName(), field.getDeclaringClass().getName(), fieldClazz.getName()));
             }
@@ -277,10 +307,13 @@ public class HBObjectMapper {
      */
     private void validateHBColumnField(Field field) {
         WrappedHBColumn hbColumn = new WrappedHBColumn(field);
+        //获取属性修饰符
         int modifiers = field.getModifiers();
+        //是否为瞬时属性
         if (Modifier.isTransient(modifiers)) {
             throw new MappedColumnCantBeTransientException(field, hbColumn.getName());
         }
+        //是否静态属性
         if (Modifier.isStatic(modifiers)) {
             throw new MappedColumnCantBeStaticException(field, hbColumn.getName());
         }
@@ -296,39 +329,49 @@ public class HBObjectMapper {
         Class<T> clazz = (Class<T>) record.getClass();
         //得到所有的属性
         Collection<Field> fields = getHBColumnFields0(clazz).values();
-        //排序
+        //排序，三层Map：最外层 key-列族 ，中间层 key-列唯一标识，最内层 key-时间戳 value-值
         NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+        //记录Entity中Field赋值的次数
         int numOfFieldsToWrite = 0;
         for (Field field : fields) {
-            //列属性
+            //列属性包装类
             WrappedHBColumn hbColumn = new WrappedHBColumn(field);
             //单版本
             if (hbColumn.isSingleVersioned()) {
+                //列族、列唯一标识
                 byte[] familyName = hbColumn.familyBytes();
                 byte[] columnName = hbColumn.columnBytes();
                 if (!map.containsKey(familyName)) {
                     map.put(familyName, new TreeMap<>(Bytes.BYTES_COMPARATOR));
                 }
                 Map<byte[], NavigableMap<Long, byte[]>> columns = map.get(familyName);
+                //将Entity属性值 映射 为 byte[]
                 final byte[] fieldValueBytes = getFieldValueAsBytes(record, field, hbColumn.codecFlags());
                 if (fieldValueBytes == null || fieldValueBytes.length == 0) {
                     continue;
                 }
+                //单独创建对象，用于和多版本数据结构保持一致
                 NavigableMap<Long, byte[]> singleValue = new TreeMap<>();
+                //默认时间戳
                 singleValue.put(HConstants.LATEST_TIMESTAMP, fieldValueBytes);
                 columns.put(columnName, singleValue);
+                //+1操作
                 numOfFieldsToWrite++;
+
             } else if (hbColumn.isMultiVersioned()) {
+                //多版本 属性
                 NavigableMap<Long, byte[]> fieldValueVersions = getFieldValuesAsNavigableMapOfBytes(record, field, hbColumn.codecFlags());
                 if (fieldValueVersions == null){
                     continue;
                 }
+                //列族、列唯一标识
                 byte[] familyName = hbColumn.familyBytes(), columnName = hbColumn.columnBytes();
                 if (!map.containsKey(familyName)) {
                     map.put(familyName, new TreeMap<>(Bytes.BYTES_COMPARATOR));
                 }
                 Map<byte[], NavigableMap<Long, byte[]>> columns = map.get(familyName);
                 columns.put(columnName, fieldValueVersions);
+
                 numOfFieldsToWrite++;
             }
         }
@@ -338,6 +381,14 @@ public class HBObjectMapper {
         return map;
     }
 
+    /**
+     * 将Field值映射为byte[]
+     * @param record
+     * @param field
+     * @param codecFlags
+     * @param <R>
+     * @return
+     */
     private <R extends Serializable & Comparable<R>> byte[] getFieldValueAsBytes(HBRecord<R> record, Field field, Map<String, String> codecFlags) {
         Serializable fieldValue;
         try {
@@ -349,20 +400,35 @@ public class HBObjectMapper {
         return valueToByteArray(fieldValue, codecFlags);
     }
 
+    /**
+     * 将Entity中多版本属性（属性类型为Map）的value值映射为byte[]
+     * @param record
+     * @param field
+     * @param codecFlags
+     * @param <R>
+     * @return
+     */
     private <R extends Serializable & Comparable<R>> NavigableMap<Long, byte[]> getFieldValuesAsNavigableMapOfBytes(HBRecord<R> record, Field field, Map<String, String> codecFlags) {
         try {
             field.setAccessible(true);
+            //多版本 此处目前将多版本属性类型为NavigableMap，其中value为泛型R。不可定义为Object（顶级父类，未实现接口 Serializable）
             @SuppressWarnings("unchecked")
             NavigableMap<Long, R> fieldValueVersions = (NavigableMap<Long, R>) field.get(record);
+
+            //多版本对象值不能为空对象，但可为null
             if (fieldValueVersions == null){
                 return null;
             }
             if (fieldValueVersions.size() == 0) {
                 throw new FieldAnnotatedWithHBColumnMultiVersionCantBeEmpty();
             }
+
+            //多版本封装
             NavigableMap<Long, byte[]> output = new TreeMap<>();
             for (Map.Entry<Long, R> e : fieldValueVersions.entrySet()) {
+                //时间戳
                 Long timestamp = e.getKey();
+                //值
                 R fieldValue = e.getValue();
                 if (fieldValue == null){
                     continue;
@@ -388,11 +454,15 @@ public class HBObjectMapper {
     @SuppressWarnings("unchecked")
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Put writeValueAsPut(HBRecord<R> record) {
         validateHBClass((Class<T>) record.getClass());
-        //创建put实例
+        //创建put实例（指定行键）
         Put put = new Put(composeRowKey(record));
+
+        //先将属性映射为Map，然后遍历所有的属性
         for (Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : convertRecordToMap(record).entrySet()) {
+            //行键
             byte[] family = fe.getKey();
             for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
+                //列唯一标识
                 byte[] columnName = e.getKey();
                 NavigableMap<Long, byte[]> columnValuesVersioned = e.getValue();
                 if (columnValuesVersioned == null){
@@ -416,6 +486,7 @@ public class HBObjectMapper {
      */
     public <R extends Serializable & Comparable<R>> List<Put> writeValueAsPut(List<HBRecord<R>> records) {
         List<Put> puts = new ArrayList<>(records.size());
+        //循环映射
         for (HBRecord<R> record : records) {
             Put put = writeValueAsPut(record);
             puts.add(put);
@@ -435,16 +506,22 @@ public class HBObjectMapper {
     @SuppressWarnings("unchecked")
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Result writeValueAsResult(HBRecord<R> record) {
         validateHBClass((Class<T>) record.getClass());
+        //行键
         byte[] row = composeRowKey(record);
+        //单元格列表
         List<Cell> cellList = new ArrayList<>();
+
         for (Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> fe : convertRecordToMap(record).entrySet()) {
+            //列族
             byte[] family = fe.getKey();
             for (Map.Entry<byte[], NavigableMap<Long, byte[]>> e : fe.getValue().entrySet()) {
+                //列唯一标识
                 byte[] columnName = e.getKey();
                 NavigableMap<Long, byte[]> valuesVersioned = e.getValue();
                 if (valuesVersioned == null){
                     continue;
                 }
+                //封装单元格数据：多个版本的数据，当作多个单元格处理
                 for (Map.Entry<Long, byte[]> columnVersion : valuesVersioned.entrySet()) {
                     CellBuilder cellBuilder = CellBuilderFactory.create(CellBuilderType.DEEP_COPY);
                     cellBuilder.setType(Cell.Type.Put).setRow(row).setFamily(family).setQualifier(columnName).setTimestamp(columnVersion.getKey()).setValue(columnVersion.getValue());
@@ -532,16 +609,27 @@ public class HBObjectMapper {
         return convertMapToRecord(rowKeyBytes, result.getMap(), clazz);
     }
 
+    /**
+     * 封装多版本属性
+     * @param obj Entity
+     * @param field 属性
+     * @param columnValuesVersioned 属性数据源
+     * @param codecFlags
+     */
     private void objectSetFieldValue(Object obj, Field field, NavigableMap<Long, byte[]> columnValuesVersioned, Map<String, String> codecFlags) {
         if (columnValuesVersioned == null){
             return;
         }
         try {
             field.setAccessible(true);
+            //多版本对象
             NavigableMap<Long, Object> columnValuesVersionedBoxed = new TreeMap<>();
+            //循环取出该行的所有版本数据
             for (Map.Entry<Long, byte[]> versionAndValue : columnValuesVersioned.entrySet()) {
+
                 columnValuesVersionedBoxed.put(versionAndValue.getKey(), byteArrayToValue(versionAndValue.getValue(), ((ParameterizedType) field.getGenericType()).getActualTypeArguments()[1], codecFlags));
             }
+            //赋值
             field.set(obj, columnValuesVersionedBoxed);
         } catch (Exception ex) {
             throw new ConversionFailedException(String.format("Could not set value on field \"%s\" on instance of class %s", field.getName(), obj.getClass()), ex);
@@ -554,6 +642,7 @@ public class HBObjectMapper {
         }
         try {
             field.setAccessible(true);
+            //先反序列化，再赋值
             field.set(obj, byteArrayToValue(value, field.getGenericType(), codecFlags));
         } catch (IllegalAccessException e) {
             throw new ConversionFailedException(String.format("Could not set value on field \"%s\" on instance of class %s", field.getName(), obj.getClass()), e);
@@ -568,9 +657,11 @@ public class HBObjectMapper {
      */
     Object byteArrayToValue(byte[] value, Type type, Map<String, String> codecFlags) {
         try {
+            //判断属性值
             if (value == null || value.length == 0){
                 return null;
             }
+            //反序列化
             return codec.deserialize(value, type, codecFlags);
         } catch (DeserializationException e) {
             throw new CodecException("Error while deserializing", e);
@@ -591,9 +682,11 @@ public class HBObjectMapper {
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(ImmutableBytesWritable rowKey, Put put, Class<T> clazz) {
         validateHBClass(clazz);
+        //若入参行键值为null时，则从Put对象中取值
         if (rowKey == null){
             return readValueFromPut(put, clazz);
         }
+        //映射
        return readValueFromRowAndPut(rowKey.get(), put, clazz);
     }
 
@@ -610,23 +703,40 @@ public class HBObjectMapper {
      * @throws CodecException One or more column values is a <code>byte[]</code> that couldn't be deserialized into field type (as defined in your entity class)
      */
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(R rowKey, Put put, Class<T> clazz) {
+        //若入参行键值为null时，则从Put对象中取值
         if (rowKey == null) {
             return readValueFromPut(put, clazz);
         }
+        //映射
         return readValueFromRowAndPut(rowKeyToBytes(rowKey, WrappedHBTable.getCodecFlags(clazz)), put, clazz);
 
     }
 
+    /**
+     * 将Put对象中值映射到Entity
+     * @param rowKeyBytes 行键byte[]
+     * @param put Put对象
+     * @param clazz Entity class
+     * @param <R> 行键泛型
+     * @param <T> Entity泛型
+     * @return
+     */
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValueFromRowAndPut(byte[] rowKeyBytes, Put put, Class<T> clazz) {
+        //获取各个family对应的单元格
         Map<byte[], List<Cell>> rawMap = put.getFamilyCellMap();
+        //创建对应Map
         NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map = new TreeMap<>(Bytes.BYTES_COMPARATOR);
+        //循环
         for (Map.Entry<byte[], List<Cell>> familyNameAndColumnValues : rawMap.entrySet()) {
+            //列族
             byte[] family = familyNameAndColumnValues.getKey();
             if (!map.containsKey(family)) {
                 map.put(family, new TreeMap<>(Bytes.BYTES_COMPARATOR));
             }
+            //当前列族的单元格数据
             List<Cell> cellList = familyNameAndColumnValues.getValue();
             for (Cell cell : cellList) {
+                //获取列唯一标识
                 byte[] column = CellUtil.cloneQualifier(cell);
                 if (!map.get(family).containsKey(column)) {
                     map.get(family).put(column, new TreeMap<>());
@@ -634,13 +744,24 @@ public class HBObjectMapper {
                 map.get(family).get(column).put(cell.getTimestamp(), CellUtil.cloneValue(cell));
             }
         }
+        //映射
         return convertMapToRecord(rowKeyBytes, map, clazz);
     }
 
+    /**
+     * 将Put对象属性映射到Entity
+     * @param put Put对象
+     * @param clazz Entity class
+     * @param <R> 行键泛型
+     * @param <T> Entity泛型
+     * @return
+     */
     private <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValueFromPut(Put put, Class<T> clazz) {
+        //判断
         if (put == null || put.isEmpty() || put.getRow() == null || put.getRow().length == 0) {
             return null;
         }
+        //映射
         return readValueFromRowAndPut(put.getRow(), put, clazz);
     }
 
@@ -656,6 +777,7 @@ public class HBObjectMapper {
      */
     public <R extends Serializable & Comparable<R>, T extends HBRecord<R>> T readValue(Put put, Class<T> clazz) {
         validateHBClass(clazz);
+        //映射
         return readValueFromPut(put, clazz);
     }
 
@@ -679,11 +801,12 @@ public class HBObjectMapper {
             throw new NullPointerException("Cannot compose row key for null objects");
         }
         validateHBClass((Class<T>) record.getClass());
+        //使用不可变对象封装
         return new ImmutableBytesWritable(composeRowKey(record));
     }
 
     /**
-     * 获取rowKey
+     * 获取rowKey的byte[]
      * @param record
      * @param <R>
      * @param <T>
@@ -714,6 +837,7 @@ public class HBObjectMapper {
      */
     <R extends Serializable & Comparable<R>, T extends HBRecord<R>> Map<String, Integer> getColumnFamiliesAndVersions(Class<T> clazz) {
         final WrappedHBTable<R, T> hbTable = validateHBClass(clazz);
+        //获取列族的版本信息
         return hbTable.getFamiliesAndVersions();
     }
 
@@ -766,7 +890,9 @@ public class HBObjectMapper {
                     mappings.put(field.getName(), field);
                 }
             }
+            //若存在继承关系，则递归获取
             Class<?> parentClass = thisClass.getSuperclass();
+            //继承父类必须标明注解：@MappedSuperClass
             thisClass = parentClass.isAnnotationPresent(MappedSuperClass.class) ? parentClass : null;
         }
         return mappings;
